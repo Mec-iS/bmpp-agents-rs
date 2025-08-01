@@ -7,8 +7,8 @@ pub use codegen::BmppCodeGenerator;
 
 use anyhow::Result;
 
-/// Convenience function to compile BMPP source code directly into Rust code.
-pub fn compile(source: &str) -> Result<String> {
+/// Convenience function to transpile BMPP source code directly into Rust code.
+pub fn transpile(source: &str) -> Result<String> {
     let ast = parse_source(source)?;
     let codegen = BmppCodeGenerator::new();
     let generated_code = codegen.generate(&ast)?;

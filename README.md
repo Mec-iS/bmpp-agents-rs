@@ -1,11 +1,14 @@
 # Blindly Meaningful Protocol
 
-Create programmatically any agent you need from an annotated payload, using BMP.
+Create programmatically any agent you need from an annotated payload, using BMPP (temporary name: Blindly Meaningful Prompting Protoocol).
 
 This is part of the research carried on for the W3C Web Agents working group for Web Agents interoperability.
 
 BMP is a formal protocol to define LLM interactions for LLM systems interoperability. It is inspired by **BSPL** ([paper](https://www.cs.huji.ac.il/~jeff/aamas11/papers/A4_B57.pdf) and [related work](https://www.lancaster.ac.uk/~chopraak/publications.html)) and by **Meaning Typed Prompting*. As presented in [this paper](https://arxiv.org/pdf/2410.18146).
 
+**TODO**:
+* implement other OpenAI-compliant remote APIs
+* implement transpiling to vanilla Python or LangChain/GraphChain
 
 ## Build
 ```
@@ -16,52 +19,51 @@ Run tests:
 $ cargo test
 ```
 
-
 ## Usage
+
+### Base usage for parsing and transpiling:
 ```
 # Parse and validate a protocol
-bmpp-agents parse protocol.bmpp --validate
+cargo run parse protocol.bmpp --validate
 
-# Compile to Rust
-bmpp-agents compile protocol.bmpp --output-dir ./generated --target rust
+# Transpile to Rust
+cargo run transpile protocol.bmpp --output-dir ./generated --target rust
 
 # Validate protocol semantics
-bmpp-agents validate protocol.bmpp --semantic-check --flow-check
+cargo run validate protocol.bmpp --semantic-check --flow-check
 
 # Format a protocol file
-bmpp-agents format protocol.bmpp --in-place
+cargo run format protocol.bmpp --in-place
 
 # Create a new protocol from template
-bmpp-agents init MyProtocol --template basic --output my_protocol.bmpp
+cargo run init MyProtocol --template basic --output my_protocol.bmpp
 ```
 
-## Usage
+### Integration with local Ollama for NL:
 
-It works for now it only works with Ollama but simple clients to any OpenAI-style API could be implemented.
+Need Ollama installed, see below.
+```
+# Convert a BMPP protocol to natural language
+bmpp-agents from-protocol protocol.bmpp --style detailed --output description.txt
 
-1. Create your resource description file or string (see `examples/`)
-2. `cargo run -- your_file.vibe`
-3. modify the `generated/main.rs` to make the desired calls to the LLM using the pregenerated code
-4. `cd generate && cargo run`. Enjoy 
+# Convert natural language to BMPP protocol
+bmpp-agents to-protocol "A simple protocol where a customer requests a quote from a supplier" --output generated_protocol.bmpp
 
-## Build
-```
-$ cargo build
-```
-Run an example:
-```
-$ cargo run -- examples/knowledge_retrieval.vibe --output-dir ./generated
-```
-Run tests:
-```
-$ cargo test
-# OR
-$ cargo test --test test_unit_extra
+# Read from file and generate protocol with validation
+bmpp-agents to-protocol requirements.txt --input-file --max-attempts 5
+
+# Generate without validation (useful for debugging)
+bmpp-agents to-protocol "A three-party negotiation protocol" --skip-validation
+
+# Verbose mode for detailed output
+bmpp-agents from-protocol protocol.bmpp --verbose --style technical
 ```
 
-### install ollama
 
-For now this only support Ollama.
+
+## Install Ollama
+
+For now this repo only support Ollama.
 
 ```
 $ curl -fsSL https://ollama.com/install.sh | sh

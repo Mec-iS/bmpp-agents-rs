@@ -1,5 +1,5 @@
-use crate::compiler;
-use crate::compiler::project_builder::ProjectBuilder;
+use crate::transpiler;
+use crate::transpiler::project_builder::ProjectBuilder;
 use crate::config::Config;
 use crate::runtime::client::LlmClient;
 use anyhow::Result;
@@ -12,7 +12,7 @@ use std::process::Command;
 /// This function handles the end-to-end process:
 /// 1. Reads and compiles the VibeLang source into Rust code.
 /// 2. Uses the `ProjectBuilder` to create a new Cargo project in the specified output directory.
-/// 3. Executes `cargo run` within the new project's directory to compile and run the binary.
+/// 3. Executes `cargo run` within the new project's directory to transpile and run the binary.
 ///
 /// # Arguments
 /// * `source_path` - Path to the input `.vibe` file.
@@ -27,7 +27,7 @@ pub fn run_file<P: AsRef<Path>>(source_path: P, output_dir: P, as_lib: bool) -> 
         source_path
     );
     let source_code = fs::read_to_string(source_path)?;
-    let generated_code = compiler::compile(&source_code, as_lib)?;
+    let generated_code = transpiler::transpile(&source_code)?;
 
     // Step 2: Build the project structure in the 'generated' directory.
     println!(
@@ -44,7 +44,7 @@ pub fn run_file<P: AsRef<Path>>(source_path: P, output_dir: P, as_lib: bool) -> 
         return Ok(());
     }
 
-    // Step 3: Compile and run the generated project's binary.
+    // Step 3: Transpile and run the generated project's binary.
     println!("⚙️  [3/3] Compiling and running the generated project...");
     let status = Command::new("cargo")
         .arg("run")
@@ -53,7 +53,7 @@ pub fn run_file<P: AsRef<Path>>(source_path: P, output_dir: P, as_lib: bool) -> 
 
     if !status.success() {
         anyhow::bail!(
-            "Failed to compile or run the generated project. Review the output above for errors."
+            "Failed to transpile or run the generated project. Review the output above for errors."
         );
     }
 

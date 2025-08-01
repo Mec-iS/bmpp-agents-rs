@@ -96,4 +96,42 @@ pub enum Commands {
         #[arg(short, long, default_value = "basic")]
         template: String,
     },
+
+    /// Convert BMPP protocol to natural language description using Ollama
+    FromProtocol {
+        /// Input BMPP file to convert
+        #[arg(value_name = "FILE")]
+        input: PathBuf,
+        
+        /// Output file for natural language description (optional, defaults to stdout)
+        #[arg(short, long)]
+        output: Option<PathBuf>,
+        
+        /// Style of natural language output (summary, detailed, technical)
+        #[arg(long, default_value = "detailed")]
+        style: String,
+    },
+
+    /// Convert natural language description to BMPP protocol using Ollama
+    ToProtocol {
+        /// Natural language description (either as string or file path)
+        #[arg(value_name = "DESCRIPTION")]
+        input: String,
+        
+        /// Treat input as file path instead of direct text
+        #[arg(long)]
+        input_file: bool,
+        
+        /// Output file for generated BMPP protocol
+        #[arg(short, long)]
+        output: Option<PathBuf>,
+        
+        /// Skip validation of generated protocol
+        #[arg(long)]
+        skip_validation: bool,
+
+        /// Number of generation attempts if validation fails
+        #[arg(long, default_value = "3")]
+        max_attempts: u32,
+    },
 }

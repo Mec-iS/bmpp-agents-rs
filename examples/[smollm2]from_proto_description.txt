@@ -1,0 +1,33 @@
+The BMPP protocol, as described in the provided specification, is a multi-party interaction protocol designed for facilitating exchanges between buyers and sellers in various industries. The purpose of this protocol is to enable secure and efficient transactions by establishing clear communication channels and defining roles for each participant.
+
+**Participants:**
+
+1. **Buyer**: A party interested in acquiring an item or service, represented as the "B" role.
+2. **Seller**: A party offering the item or service being requested, represented as the "S" role.
+3. **Shipper**: An entity responsible for logistics and transportation of the purchased item, represented as the "Shipper" role.
+
+**Data Flow:**
+
+1. The Buyer initiates the protocol by sending a request for a price quote (rfq action) to the Seller, specifying an item identifier, its name or description, and expected shipping address.
+2. The Seller responds with a quoted price (quote action), containing the requested item's details and their associated cost.
+3. The Buyer accepts or rejects the quoted price based on their satisfaction. If accepted, they instruct the Shipper to ship the purchased item using the provide shipment instructions (ship action).
+4. Once the shipping is initiated, the Seller confirms receipt of the shipment instruction (shipped action) from the Shipper.
+5. The Buyer receives confirmation of successful delivery through the deliver action, indicating that their item has been successfully shipped and delivered to their specified address.
+
+**Interactions:**
+
+1. **Buyer requests a quote**: Buyer initiates interaction by sending rfq action to Seller with requested item details.
+2. **Seller responds with price**: Seller sends quote action with item details, cost, and shipping information upon receiving the buyer's request.
+3. **Buyer accepts or rejects quote**: Buyer acknowledges acceptance of the quoted price through accept action or rejection through reject action.
+4. **Shipper is instructed**: If accepted, Buyer instructs Shipper to ship the purchased item using provide shipment instructions (ship action).
+5. **Seller confirms shipping instruction**: Seller receives and verifies receipt of shipment instruction (shipped action) from the Buyer's agent.
+6. **Buyer receives confirmation of delivery**: Buyer acknowledges successful delivery through deliver action, indicating that their item has been successfully shipped and delivered to their specified address.
+
+**Important Constraints or Business Rules:**
+
+1. **Confidentiality**: All data exchanged between participants must be kept confidential throughout the protocol.
+2. **Authentication**: Participants must ensure secure authentication of each other's identities before initiating interactions.
+3. **Compliance with laws and regulations**: The protocol must adhere to relevant local, national, or international laws and regulations governing transactions.
+4. **Transparency**: All participants are required to provide clear descriptions of the items being exchanged and their associated costs.
+5. **Responsibility for logistics**: The Shipper is responsible for ensuring timely and safe transportation of the purchased item.
+6. **Confidentiality of shipping information**: All shipping-related data, including addresses and estimated delivery times, must be kept confidential to prevent unauthorized access or misuse.

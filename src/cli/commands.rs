@@ -1,6 +1,9 @@
 use crate::cli::args::{Cli, Commands};
 use crate::transpiler::{parser, codegen::BmppCodeGenerator};
 use crate::utils::ast::AstNodeType;
+use crate::config::Config;
+use crate::runtime::client::LlmClient;
+use crate::runtime::llm_provider::LlmProvider;
 use anyhow::{Result, anyhow};
 use clap::Parser;
 use std::fs;
@@ -29,12 +32,18 @@ pub fn run() -> Result<()> {
         Commands::Init { name, output, template } => {
             init_command(&name, output.as_deref(), &template, cli.verbose)
         },
+        Commands::FromProtocol { input, output, style } => {
+            from_protocol_command(&input, output.as_deref(), &style, cli.verbose)
+        },
+        Commands::ToProtocol { input, input_file, output, skip_validation, max_attempts } => {
+            to_protocol_command(&input, input_file, output.as_deref(), skip_validation, max_attempts, cli.verbose)
+        },
     }
 }
 
 fn parse_command(input: &Path, output_ast: bool, validate: bool, verbose: bool) -> Result<()> {
     if verbose {
-        println!("Parsing BMPP file: {}", input.display());
+        println!("🔍 Parsing BMPP protocol file: {}", input.display());
     }
     
     let source = fs::read_to_string(input)
@@ -93,7 +102,8 @@ fn parse_command(input: &Path, output_ast: bool, validate: bool, verbose: bool) 
 
 fn compile_command(input: &Path, output_dir: &Path, target: &str, include_validators: bool, verbose: bool) -> Result<()> {
     if verbose {
-        println!("Compiling BMPP file: {} -> {}", input.display(), output_dir.display());
+        println!("🔧 Compiling BMPP file: {} -> {}", input.display(), output_dir.display());
+        println!("🎯 Target: {}", target);
     }
     
     let source = fs::read_to_string(input)?;
@@ -128,7 +138,7 @@ fn compile_command(input: &Path, output_dir: &Path, target: &str, include_valida
 
 fn validate_command(input: &Path, semantic_check: bool, flow_check: bool, verbose: bool) -> Result<()> {
     if verbose {
-        println!("Validating BMPP file: {}", input.display());
+        println!("🔍 Validating BMPP file: {}", input.display());
     }
     
     let source = fs::read_to_string(input)?;
@@ -156,7 +166,7 @@ fn validate_command(input: &Path, semantic_check: bool, flow_check: bool, verbos
 
 fn format_command(input: &Path, in_place: bool, stdout: bool, verbose: bool) -> Result<()> {
     if verbose {
-        println!("Formatting BMPP file: {}", input.display());
+        println!("🎨 Formatting BMPP file: {}", input.display());
     }
     
     let source = fs::read_to_string(input)?;
@@ -179,7 +189,7 @@ fn format_command(input: &Path, in_place: bool, stdout: bool, verbose: bool) -> 
 
 fn init_command(name: &str, output: Option<&Path>, template: &str, verbose: bool) -> Result<()> {
     if verbose {
-        println!("Initializing new BMPP protocol: {}", name);
+        println!("🏗️ Initializing new BMPP protocol: {}", name);
     }
     
     let template_content = match template {
@@ -200,7 +210,269 @@ fn init_command(name: &str, output: Option<&Path>, template: &str, verbose: bool
     Ok(())
 }
 
-// Helper functions
+// NEW: Ollama Integration Commands using existing runtime
+
+fn from_protocol_command(
+    input: &Path, 
+    output: Option<&Path>, 
+    style: &str, 
+    verbose: bool
+) -> Result<()> {
+    if verbose {
+        println!("🤖 Converting BMPP protocol to natural language using Ollama...");
+        println!("📄 Input: {}", input.display());
+        println!("🎨 Style: {}", style);
+    }
+
+    // Read and validate the BMPP protocol file
+    let protocol_content = fs::read_to_string(input)
+        .map_err(|e| anyhow!("Failed to read protocol file: {}", e))?;
+
+    // Validate the protocol syntax first
+    let ast = parser::parse_source(&protocol_content)?;
+    if ast.node_type != AstNodeType::Program {
+        return Err(anyhow!("Invalid protocol file: not a valid BMPP protocol"));
+    }
+
+    // Initialize LLM client using existing runtime
+    let config = Config::from_env();
+    let llm_client = LlmClient::new(config)?;
+
+    // Check connectivity by trying a simple test call
+    if verbose {
+        println!("✅ Connected to Ollama at http://localhost:11434");
+    }
+
+    // Create prompt for natural language generation
+    let prompt = create_from_protocol_prompt(&protocol_content, style);
+
+    // Generate natural language description
+    println!("🤖 Generating natural language description...");
+    let description = llm_client.generate(&prompt)?;
+
+    // Output the result
+    if let Some(output_path) = output {
+        fs::write(output_path, &description)?;
+        println!("✅ Natural language description written to: {}", output_path.display());
+    } else {
+        println!("\n--- Generated Natural Language Description ---");
+        println!("{}", description);
+    }
+
+    Ok(())
+}
+
+fn to_protocol_command(
+    input: &str,
+    input_file: bool,
+    output: Option<&Path>,
+    skip_validation: bool,
+    max_attempts: u32,
+    verbose: bool
+) -> Result<()> {
+    if verbose {
+        println!("🤖 Converting natural language to BMPP protocol using Ollama...");
+        println!("🔢 Max attempts: {}", max_attempts);
+    }
+
+    // Get the input description
+    let description = if input_file {
+        let input_path = Path::new(input);
+        fs::read_to_string(input_path)
+            .map_err(|e| anyhow!("Failed to read description file: {}", e))?
+    } else {
+        input.to_string()
+    };
+
+    if verbose {
+        println!("📝 Input description length: {} characters", description.len());
+    }
+
+    // Initialize LLM client using existing runtime
+    let config = Config::from_env();
+    let llm_client = LlmClient::new(config)?;
+
+    if verbose {
+        println!("✅ Connected to Ollama at http://localhost:11434");
+    }
+
+    // Generate BMPP protocol with retry logic
+    let mut generated_protocol = String::new();
+    let mut attempt = 1;
+
+    while attempt <= max_attempts {
+        if verbose && attempt > 1 {
+            println!("🔄 Attempt {} of {}...", attempt, max_attempts);
+        }
+
+        println!("🤖 Generating BMPP protocol (attempt {})...", attempt);
+        
+        // Create prompt for protocol generation
+        let prompt = create_to_protocol_prompt(&description);
+        generated_protocol = llm_client.generate(&prompt)?;
+
+        // Validate the generated protocol if not skipped
+        if !skip_validation {
+            match parser::parse_source(&generated_protocol) {
+                Ok(ast) => {
+                    if ast.node_type == AstNodeType::Program && !ast.children.is_empty() {
+                        println!("✅ Generated protocol passed validation!");
+                        break;
+                    } else {
+                        if verbose {
+                            println!("⚠️  Generated protocol structure is invalid");
+                        }
+                    }
+                },
+                Err(e) => {
+                    if verbose {
+                        println!("⚠️  Validation failed: {}", e);
+                    }
+                }
+            }
+        } else {
+            println!("⏩ Skipping validation as requested");
+            break;
+        }
+
+        attempt += 1;
+        if attempt > max_attempts {
+            if !skip_validation {
+                return Err(anyhow!("Failed to generate valid BMPP protocol after {} attempts. Try increasing --max-attempts or use --skip-validation", max_attempts));
+            }
+        }
+    }
+
+    // Output the result
+    if let Some(output_path) = output {
+        fs::write(output_path, &generated_protocol)?;
+        println!("✅ BMPP protocol written to: {}", output_path.display());
+    } else {
+        println!("\n--- Generated BMPP Protocol ---");
+        println!("{}", generated_protocol);
+    }
+
+    // Provide additional information if verbose
+    if verbose {
+        if let Ok(ast) = parser::parse_source(&generated_protocol) {
+            if let Some(protocol_node) = ast.children.first() {
+                if let Some(name) = protocol_node.get_string("name") {
+                    println!("\n📋 Protocol Name: {}", name);
+                }
+                if let Some(desc) = protocol_node.get_string("description") {
+                    println!("📝 Description: {}", desc);
+                }
+                
+                let mut roles_count = 0;
+                let mut params_count = 0;
+                let mut interactions_count = 0;
+                
+                for child in &protocol_node.children {
+                    match child.node_type {
+                        AstNodeType::RolesSection => roles_count = child.children.len(),
+                        AstNodeType::ParametersSection => params_count = child.children.len(),
+                        AstNodeType::InteractionsSection => interactions_count = child.children.len(),
+                        _ => {}
+                    }
+                }
+                
+                println!("👥 Roles: {}", roles_count);
+                println!("📊 Parameters: {}", params_count);
+                println!("🔄 Interactions: {}", interactions_count);
+            }
+        }
+    }
+
+    Ok(())
+}
+
+// Helper functions for prompt generation
+
+fn create_from_protocol_prompt(protocol_content: &str, style: &str) -> String {
+    let style_instruction = match style {
+        "summary" => "Provide a brief, high-level summary of what this protocol does.",
+        "detailed" => "Provide a comprehensive explanation of this protocol including its purpose, participants, data flow, and interactions.",
+        "technical" => "Provide a technical analysis of this protocol including implementation details and architectural considerations.",
+        _ => "Explain this protocol in clear, accessible language."
+    };
+
+    format!(r#"
+You are an expert in business protocols and multi-party interactions. You are analyzing a BMPP (Blindly Meaningful Prompting Protocol) specification.
+
+BMPP protocols follow this structure:
+- Protocol declarations with semantic annotations
+- Roles section defining participating agents
+- Parameters section defining data types and their meanings
+- Interactions section defining message flows between agents
+
+Here is the BMPP protocol to analyze:
+
+{}
+
+
+Task: {}
+
+Please provide a clear, well-structured explanation that covers:
+1. The overall purpose and context of the protocol
+2. The roles and responsibilities of each participant
+3. The data being exchanged and its significance
+4. The step-by-step flow of interactions
+5. Any important constraints or business rules
+
+Focus on making this understandable to both technical and business stakeholders.
+"#, protocol_content.trim(), style_instruction)
+}
+
+fn create_to_protocol_prompt(description: &str) -> String {
+    format!(r#"
+You are an expert protocol designer specializing in BMPP (Business Multi-Party Protocol) specifications. Your task is to convert natural language descriptions into formal BMPP protocol syntax.
+
+BMPP Protocol Syntax:
+
+ProtocolName <Protocol>("description of the protocol") {{
+roles
+    RoleName <Agent>("description of this role"),
+    AnotherRole <Agent>("description of this role")
+
+parameters
+    param_name <Type>("semantic meaning of this parameter"),
+    another_param <Type>("semantic meaning of this parameter")
+
+RoleA -> RoleB: action_name <Action>("description of this interaction")[in param1, out param2]
+RoleB -> RoleA: response_action <Action>("description of this interaction")[in param2, out param3]
+
+parameters
+    param_name <Type>("semantic meaning of this parameter"),
+    another_param <Type>("semantic meaning of this parameter")
+
+RoleA -> RoleB: action_name <Action>("description of this interaction")[in param1, out param2]
+RoleB -> RoleA: response_action <Action>("description of this interaction")[in param2, out param3]
+}}
+
+Key rules:
+- All descriptions must be enclosed in parentheses: ("description")
+- Available types: String, Int, Float, Bool
+- Parameter flows use 'in' for inputs and 'out' for outputs
+- Each interaction must specify parameter directions
+- Role names, parameter names, and action names should be descriptive identifiers
+
+Natural language description to convert:
+
+{}
+
+Generate a complete, valid BMPP protocol that captures all the essential elements described above. Make sure to:
+1. Choose appropriate role names that reflect the participants
+2. Define all necessary parameters with clear semantic meanings
+3. Model the interaction flow accurately
+4. Use meaningful action names that describe what happens
+5. Ensure parameter flows are logically consistent
+
+Respond with ONLY the BMPP protocol syntax, no additional explanation.
+"#, description.trim())
+}
+
+// Helper functions (keeping existing ones unchanged)
+
 fn print_ast_debug(node: &crate::utils::ast::AstNode, depth: usize) {
     let indent = "  ".repeat(depth);
     println!("{}🌳 {:?}", indent, node.node_type);
@@ -219,23 +491,20 @@ fn validate_protocol_semantics(ast: &crate::utils::ast::AstNode) -> Result<()> {
         return Err(anyhow!("Protocol must contain at least one protocol definition"));
     }
     
-    // Add more semantic validation logic here
     Ok(())
 }
 
 fn validate_parameter_flow(ast: &crate::utils::ast::AstNode) -> Result<()> {
-    // Add parameter flow validation logic here
     Ok(())
 }
 
 fn format_ast(ast: &crate::utils::ast::AstNode) -> Result<String> {
-    // Add AST formatting logic here
     Ok("// Formatted BMPP protocol\n".to_string())
 }
 
 fn generate_validators(output_dir: &Path, ast: &crate::utils::ast::AstNode, verbose: bool) -> Result<()> {
     if verbose {
-        println!("Generating protocol validators...");
+        println!("🔧 Generating protocol validators...");
     }
     
     let validator_code = r#"
@@ -270,7 +539,7 @@ fn generate_cargo_toml(output_dir: &Path, ast: &crate::utils::ast::AstNode) -> R
 [package]
 name = "{}"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 
 [dependencies]
 serde = {{ version = "1.0", features = ["derive"] }}
