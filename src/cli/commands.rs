@@ -20,8 +20,8 @@ pub fn run() -> Result<()> {
         Commands::Parse { input, output_ast, validate } => {
             parse_command(&input, output_ast, validate, cli.verbose)
         },
-        Commands::Compile { input, output_dir, target, include_validators } => {
-            compile_command(&input, &output_dir, &target, include_validators, cli.verbose)
+        Commands::Transpile { input, output_dir, target, include_validators } => {
+            transpile_command(&input, &output_dir, &target, include_validators, cli.verbose)
         },
         Commands::Validate { input, semantic_check, flow_check } => {
             validate_command(&input, semantic_check, flow_check, cli.verbose)
@@ -100,7 +100,7 @@ fn parse_command(input: &Path, output_ast: bool, validate: bool, verbose: bool) 
     Ok(())
 }
 
-fn compile_command(input: &Path, output_dir: &Path, target: &str, include_validators: bool, verbose: bool) -> Result<()> {
+fn transpile_command(input: &Path, output_dir: &Path, target: &str, include_validators: bool, verbose: bool) -> Result<()> {
     if verbose {
         println!("🔧 Compiling BMPP file: {} -> {}", input.display(), output_dir.display());
         println!("🎯 Target: {}", target);

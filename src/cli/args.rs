@@ -33,8 +33,8 @@ pub enum Commands {
         validate: bool,
     },
     
-    /// Compile BMPP protocol to target language
-    Compile {
+    /// Transpile BMPP protocol to target language
+    Transpile {
         /// Input BMPP file to compile
         #[arg(value_name = "FILE")]
         input: PathBuf,

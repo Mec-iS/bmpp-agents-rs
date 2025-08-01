@@ -1,12 +1,20 @@
-# Blindly Meaningful Protocol
+# Blindly Meaningful Prompting Protocol
 
 Create programmatically any agent you need from an annotated payload, using BMPP (temporary name: Blindly Meaningful Prompting Protoocol).
 
 This is part of the research carried on for the W3C Web Agents working group for Web Agents interoperability.
 
-BMP is a formal protocol to define LLM interactions for LLM systems interoperability. It is inspired by **BSPL** ([paper](https://www.cs.huji.ac.il/~jeff/aamas11/papers/A4_B57.pdf) and [related work](https://www.lancaster.ac.uk/~chopraak/publications.html)) and by **Meaning Typed Prompting*. As presented in [this paper](https://arxiv.org/pdf/2410.18146).
+BMPP is a formal protocol to define LLM interactions for LLM systems interoperability. It is inspired by **BSPL** ([paper](https://www.cs.huji.ac.il/~jeff/aamas11/papers/A4_B57.pdf) and [related work](https://www.lancaster.ac.uk/~chopraak/publications.html)) and by **Meaning Typed Prompting**. As presented in [this paper](https://arxiv.org/pdf/2410.18146).
+
+This repo requires [Rust](https://www.rust-lang.org/tools/install) to run.
+
+## implementation details
+* Rust has been picked because of its type system and the formal safety of its compiler, and a good trade-off between its modern features and runtime performance.
+* this repo transpile BMPP to Rust but any language can be supported.
+* it uses the [`pest` library](https://pest.rs/) for grammar management.
 
 **TODO**:
+* port all the features from https://gitlab.com/masr/bspl (formal validition)
 * implement other OpenAI-compliant remote APIs
 * implement transpiling to vanilla Python or LangChain/GraphChain
 
@@ -44,19 +52,19 @@ cargo run init MyProtocol --template basic --output my_protocol.bmpp
 Need Ollama installed, see below.
 ```
 # Convert a BMPP protocol to natural language
-bmpp-agents from-protocol protocol.bmpp --style detailed --output description.txt
+cargo run from-protocol protocol.bmpp --style detailed --output description.txt
 
 # Convert natural language to BMPP protocol
-bmpp-agents to-protocol "A simple protocol where a customer requests a quote from a supplier" --output generated_protocol.bmpp
+cargo run to-protocol "A simple protocol where a customer requests a quote from a supplier" --output generated_protocol.bmpp
 
 # Read from file and generate protocol with validation
-bmpp-agents to-protocol requirements.txt --input-file --max-attempts 5
+cargo run to-protocol requirements.txt --input-file --max-attempts 5
 
 # Generate without validation (useful for debugging)
-bmpp-agents to-protocol "A three-party negotiation protocol" --skip-validation
+cargo run to-protocol "A three-party negotiation protocol" --skip-validation
 
 # Verbose mode for detailed output
-bmpp-agents from-protocol protocol.bmpp --verbose --style technical
+cargo run from-protocol protocol.bmpp --verbose --style technical
 ```
 
 
