@@ -4,6 +4,24 @@ use std::collections::HashMap;
 pub enum AstNodeType {
     // Core program structure
     Program,
+    
+    // BMPP-specific nodes
+    ProtocolDecl,
+    RolesSection,
+    RoleDecl,
+    ParametersSection,
+    ParameterDecl,
+    InteractionsSection,
+    InteractionDecl,
+    ParameterFlow,
+    ParameterRef,
+    Annotation,
+    
+    // Type system nodes
+    BasicType,
+    MeaningType,
+    
+    // Legacy VibeLang nodes (for compatibility)
     FunctionDecl,
     FunctionBody,
     TypeDecl,
@@ -12,25 +30,21 @@ pub enum AstNodeType {
     ClassBody,
     MemberVar,
     Import,
-
-    // Type system
-    BasicType,
-    MeaningType,
-
+    
     // Parameters and arguments
     ParamList,
     Parameter,
-
+    
     // Statements
     Block,
     ExprStmt,
     ReturnStmt,
     PromptBlock,
-
+    
     // Expressions
     CallExpr,
     Identifier,
-
+    
     // Literals
     StringLiteral,
     IntLiteral,
@@ -67,32 +81,32 @@ impl AstNode {
             parent: None,
         }
     }
-
+    
     pub fn add_child(&mut self, child: AstNode) {
         self.children.push(Box::new(child));
     }
-
+    
     // Property setters matching C API
     pub fn set_string(&mut self, name: &str, value: &str) {
         self.properties
             .insert(name.to_string(), PropertyValue::String(value.to_string()));
     }
-
+    
     pub fn set_int(&mut self, name: &str, value: i64) {
         self.properties
             .insert(name.to_string(), PropertyValue::Int(value));
     }
-
+    
     pub fn set_float(&mut self, name: &str, value: f64) {
         self.properties
             .insert(name.to_string(), PropertyValue::Float(value));
     }
-
+    
     pub fn set_bool(&mut self, name: &str, value: bool) {
         self.properties
             .insert(name.to_string(), PropertyValue::Bool(value));
     }
-
+    
     // Property getters matching C API
     pub fn get_string(&self, name: &str) -> Option<&String> {
         match self.properties.get(name) {
@@ -100,21 +114,21 @@ impl AstNode {
             _ => None,
         }
     }
-
+    
     pub fn get_int(&self, name: &str) -> Option<i64> {
         match self.properties.get(name) {
             Some(PropertyValue::Int(i)) => Some(*i),
             _ => None,
         }
     }
-
+    
     pub fn get_float(&self, name: &str) -> Option<f64> {
         match self.properties.get(name) {
             Some(PropertyValue::Float(f)) => Some(*f),
             _ => None,
         }
     }
-
+    
     pub fn get_bool(&self, name: &str) -> Option<bool> {
         match self.properties.get(name) {
             Some(PropertyValue::Bool(b)) => Some(*b),
@@ -123,10 +137,11 @@ impl AstNode {
     }
 }
 
-pub fn extract_string_value(node: &AstNode) -> Option<&String> {
+pub fn extract_string_value(node: &AstNode) -> Option<String> {
     match node.node_type {
         AstNodeType::StringLiteral => node.get_string("value"),
         AstNodeType::Identifier => node.get_string("name"),
         _ => None,
     }
+    .cloned()
 }

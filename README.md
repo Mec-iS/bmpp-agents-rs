@@ -1,8 +1,39 @@
-# VibeLang in Rust
+# Blindly Meaningful Protocol
 
-Create programmatically any agent you need from an annotated payload, using VibeLang.
+Create programmatically any agent you need from an annotated payload, using BMP.
 
-VibeLang is a format to describe LLM interactions to generic clients, base on **Meaning Typed Prompting*. As presented in [this paper](https://arxiv.org/pdf/2410.18146).
+This is part of the research carried on for the W3C Web Agents working group for Web Agents interoperability.
+
+BMP is a formal protocol to define LLM interactions for LLM systems interoperability. It is inspired by **BSPL** ([paper](https://www.cs.huji.ac.il/~jeff/aamas11/papers/A4_B57.pdf) and [related work](https://www.lancaster.ac.uk/~chopraak/publications.html)) and by **Meaning Typed Prompting*. As presented in [this paper](https://arxiv.org/pdf/2410.18146).
+
+
+## Build
+```
+$ cargo build
+```
+Run tests:
+```
+$ cargo test
+```
+
+
+## Usage
+```
+# Parse and validate a protocol
+bmpp-agents parse protocol.bmpp --validate
+
+# Compile to Rust
+bmpp-agents compile protocol.bmpp --output-dir ./generated --target rust
+
+# Validate protocol semantics
+bmpp-agents validate protocol.bmpp --semantic-check --flow-check
+
+# Format a protocol file
+bmpp-agents format protocol.bmpp --in-place
+
+# Create a new protocol from template
+bmpp-agents init MyProtocol --template basic --output my_protocol.bmpp
+```
 
 ## Usage
 

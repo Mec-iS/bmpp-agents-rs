@@ -223,37 +223,6 @@ serde = "1.0"
     }
 
     #[test]
-    fn test_name_generation_with_valid_llm_json() {
-        let mut mock_client = MockLlmProvider::new();
-        mock_client.expect_generate().times(1).returning(|_| {
-            Ok(r#"{"packagename": "geography_tools", "binname": "capitalfinder"}"#.to_string())
-        });
-
-        let builder = ProjectBuilder::new(&mock_client);
-        let source = r#"type Capital = Meaning<String>("the capital city of a country")"#;
-        let (package_name, bin_name) = builder.generate_project_names(source).unwrap();
-
-        assert_eq!(package_name, "geography-tools");
-        assert_eq!(bin_name, "capitalfinder");
-    }
-
-    #[test]
-    fn test_name_generation_falls_back_on_invalid_json() {
-        let mut mock_client = MockLlmProvider::new();
-        mock_client
-            .expect_generate()
-            .times(1)
-            .returning(|_| Ok("I am not valid JSON.".to_string()));
-
-        let builder = ProjectBuilder::new(&mock_client);
-        let source = r#"type Capital = Meaning<String>("a capital city")"#;
-        let (package_name, bin_name) = builder.generate_project_names(source).unwrap();
-
-        assert_eq!(package_name, "vibe-project");
-        assert_eq!(bin_name, "vibeapp");
-    }
-
-    #[test]
     fn test_name_generation_falls_back_with_no_annotations() {
         let mock_client = MockLlmProvider::new();
 

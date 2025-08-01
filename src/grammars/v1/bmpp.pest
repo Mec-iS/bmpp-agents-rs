@@ -1,0 +1,82 @@
+Program = { SOI ~ Protocol* ~ EOI }
+
+Protocol = {
+    ProtocolName ~ "<" ~ "Protocol" ~ ">" ~ Annotation ~ "{" ~
+    RolesSection ~
+    ParametersSection ~
+    InteractionSection ~
+    "}"
+}
+
+ProtocolName = { Identifier }
+
+// --- Annotations (mandatory parentheses) ---
+Annotation = { "(" ~ StringLiteral ~ ")" }
+
+// --- Roles Section ---
+RolesSection = {
+    "roles" ~
+    RoleDecl ~ ("," ~ RoleDecl)*
+}
+
+RoleDecl = {
+    Identifier ~ "<" ~ "Agent" ~ ">" ~ Annotation
+}
+
+// --- Parameters Section ---
+ParametersSection = {
+    "parameters" ~
+    ParameterDecl ~ ("," ~ ParameterDecl)*
+}
+
+ParameterDecl = {
+    Identifier ~ "<" ~ BasicType ~ ">" ~ Annotation
+}
+
+// --- Interactions Section ---
+InteractionSection = {
+    Interaction+
+}
+
+Interaction = {
+    RoleRef ~ "->" ~ RoleRef ~ ":" ~ ActionName ~ "<" ~ "Action" ~ ">" ~ 
+    Annotation ~ "[" ~ ParameterFlowList ~ "]"
+}
+
+ParameterFlowList = {
+    ParameterFlow ~ ("," ~ ParameterFlow)*
+    | ""  // Allow empty parameter flow
+}
+
+ParameterFlow = {
+    Direction ~ Identifier
+}
+
+Direction = { "in" | "out" }
+
+// --- Basic Types ---
+BasicType = { 
+    "String" | "Float" | "Bool" | "Int" 
+}
+
+// --- References ---
+RoleRef = { Identifier }
+ActionName = { Identifier }
+
+// --- Identifiers and Literals ---
+Identifier = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* }
+
+StringLiteral = ${ "\"" ~ StringInner ~ "\"" }
+StringInner = @{ StringChar* }
+StringChar = {
+    !("\"" | "\\") ~ ANY
+    | "\\" ~ ("\"" | "\\" | "/" | "b" | "f" | "n" | "r" | "t")
+    | "\\" ~ ("u" ~ ASCII_HEX_DIGIT{4})
+}
+
+// --- Whitespace and Comments ---
+WHITESPACE = _{ " " | "\t" | "\r" | "\n" }
+COMMENT = _{ 
+    "//" ~ (!"\n" ~ ANY)* ~ "\n"?
+    | "/*" ~ (!"*/" ~ ANY)* ~ "*/"
+}
