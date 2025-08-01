@@ -9,8 +9,8 @@ BMPP is a formal protocol to define LLM interactions for LLM systems interoperab
 This repo requires [Rust](https://www.rust-lang.org/tools/install) to run.
 
 ## implementation details
-* Rust has been picked because of its type system and the formal safety of its compiler, and a good trade-off between its modern features and runtime performance.
-* this repo transpile BMPP to Rust but any language can be supported.
+* Rust has been picked because of its type system and the formal safety of its compiler, and a good trade-off between its modern features and runtime performance. It can also be easily embedded in Python via [`pyO3`](https://github.com/PyO3/pyo3), a well-supported Python bindings library.
+* this repo transpile BMPP files to Rust but any language can be supported.
 * it uses the [`pest` library](https://pest.rs/) for grammar management.
 
 **TODO**:
