@@ -23,7 +23,7 @@ Purchase <Protocol>("the generic action of acquiring a generic item in exchange 
     // --- Interaction Protocol ---
 
     // Buyer requests a quote from the Seller.
-    B -> S: rfq <Action>("request for a price quote")[out ID, out item]
+    B -> S: rfq <Action>("request for a price quote")[in ID, in item]
 
     // Seller responds with a price.
     S -> B: quote <Action>("provide a price quote for a requested item")[in ID, in item, out price]
