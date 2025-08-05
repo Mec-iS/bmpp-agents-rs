@@ -1,42 +1,36 @@
 // the protocol is stated and annotated
 Purchase <Protocol>("the generic action of acquiring a generic item in exchange of its countervalue in currency") {
-    // --- Role Definitions ---
-    // We now define each role's part using annotations.
-    // The base type <Agent> signifies that this is an active participant.
     roles
         B <Agent>("the party wanting to buy an item"),
         S <Agent>("the party selling the item"),
         Shipper <Agent>("the third-party entity responsible for logistics")
 
-    // --- Parameter Definitions ---
-    // Parameters are the data fields exchanged in the protocol. We give each one a clear meaning.
     parameters
         ID <String>("a unique identifier for the request for quote"),
         item <String>("the name or description of the product being requested"),
         price <Float>("the cost of the item quoted by the seller"),
         address <String>("the physical destination for shipping"),
         shipped <Bool>("a confirmation status indicating the item has been dispatched"),
-        accept <Bool>("a confirmation that the buyer agrees to the quote"),
+        accept <Bool>("a confirmation that the buyer agrees to the quote"),  
         reject <Bool>("a confirmation that the buyer declines the quote"),
-        outcome <String>("a final status message describing the result of the protocol")
+        outcome_buy <String>("a final status message describing the result of buying procedure"),
+        outcome_ship <String>("a final status message describing the result of shipping procedure")
 
-    // --- Interaction Protocol ---
+    // Buyer initiates with their known item choice
+    B -> S: rfq <Action>("request for a price quote")[out ID, out item]
 
-    // Buyer requests a quote from the Seller.
-    B -> S: rfq <Action>("request for a price quote")[in ID, in item]
-
-    // Seller responds with a price.
+    // Seller consumes the request and produces pricing
     S -> B: quote <Action>("provide a price quote for a requested item")[in ID, in item, out price]
    
-    // Buyer accepts the quote.
+    // Buyer accepts (alternative path)
     B -> S: accept <Action>("accept the seller's price quote")[in ID, in item, in price, out address, out accept]
 
-    // Buyer rejects the quote.
-    B -> S: reject <Action>("reject the seller's price quote")[in ID, in item, in price, out outcome, out reject]
+    // Buyer rejects (alternative path)
+    B -> S: reject <Action>("reject the seller's price quote")[in ID, in item, in price, out outcome_buy, out reject]
 
-    // If accepted, Seller instructs the Shipper.
+    // Seller initiates shipping (only after accept)
     S -> Shipper: ship <Action>("request shipment of the purchased item")[in ID, in item, in address, out shipped]
    
-    // Shipper completes the delivery to the Buyer.
-    Shipper -> B: deliver <Action>("confirm delivery of the item to the buyer")[in ID, in item, in address, out outcome]
+    // Shipper confirms delivery
+    Shipper -> B: deliver <Action>("confirm delivery of the item to the buyer")[in ID, in item, in address, out outcome_ship]
 }

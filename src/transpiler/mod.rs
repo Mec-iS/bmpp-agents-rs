@@ -1,6 +1,7 @@
 pub mod parser;
 pub mod codegen;
 pub mod project_builder;
+pub mod validation;
 
 pub use parser::parse_source;
 pub use codegen::BmppCodeGenerator;

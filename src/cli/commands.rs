@@ -494,15 +494,16 @@ fn validate_protocol_semantics(ast: &crate::utils::ast::AstNode) -> Result<()> {
     Ok(())
 }
 
-fn validate_parameter_flow(ast: &crate::utils::ast::AstNode) -> Result<()> {
+fn validate_parameter_flow(_ast: &crate::utils::ast::AstNode) -> Result<()> {
+    // TODO: add formal verification of parameters and causal direction from BSPL
     Ok(())
 }
 
-fn format_ast(ast: &crate::utils::ast::AstNode) -> Result<String> {
+fn format_ast(_ast: &crate::utils::ast::AstNode) -> Result<String> {
     Ok("// Formatted BMPP protocol\n".to_string())
 }
 
-fn generate_validators(output_dir: &Path, ast: &crate::utils::ast::AstNode, verbose: bool) -> Result<()> {
+fn generate_validators(output_dir: &Path, _ast: &crate::utils::ast::AstNode, verbose: bool) -> Result<()> {
     if verbose {
         println!("🔧 Generating protocol validators...");
     }

@@ -2,6 +2,8 @@ use crate::utils::ast::{AstNode, AstNodeType};
 use anyhow::Result;
 use serde::Serialize;
 
+use crate::transpiler::validation::validate_parameter_flow;
+
 
 #[derive(Serialize)]
 struct Protocol {
@@ -48,6 +50,8 @@ impl BmppCodeGenerator {
     }
     
     pub fn generate(&self, ast: &AstNode) -> Result<String> {
+        validate_parameter_flow(ast)?;
+        
         let mut protocols = Vec::new();
         
         for child in &ast.children {

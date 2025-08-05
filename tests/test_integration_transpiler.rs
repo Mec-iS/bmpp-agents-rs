@@ -205,17 +205,19 @@ Negotiation <Protocol>("a complex negotiation protocol with multiple rounds") {
         Mediator <Agent>("the neutral party facilitating negotiation")
     
     parameters
-        proposal_id <String>("unique identifier for the proposal"),
+        ID <String>("unique identifier of the negotiation instance"),
+        proposal_id <String>("unique identifier of each proposal"),
         terms <String>("the terms being proposed"),
         evaluation <String>("assessment of the proposal"),
         counter_offer <String>("alternative terms proposed"),
+        mediation_id <String>("unique identifier for mediation session"),
         final_decision <Bool>("whether the negotiation succeeded"),
         reason <String>("explanation for the final decision")
     
-    Proposer -> Evaluator: submit_proposal <Action>("submit initial proposal")[out proposal_id, out terms]
+    Proposer -> Evaluator: submit_proposal <Action>("submit initial proposal")[out ID, out proposal_id, out terms]
     Evaluator -> Proposer: evaluate_proposal <Action>("provide evaluation feedback")[in proposal_id, in terms, out evaluation, out counter_offer]
-    Proposer -> Mediator: request_mediation <Action>("request third-party mediation")[in evaluation, in counter_offer, out proposal_id]
-    Mediator -> Evaluator: mediate_discussion <Action>("facilitate resolution")[in proposal_id, out final_decision, out reason]
+    Proposer -> Mediator: request_mediation <Action>("request third-party mediation")[in evaluation, in counter_offer, out mediation_id]
+    Mediator -> Evaluator: mediate_discussion <Action>("facilitate resolution")[in mediation_id, out final_decision, out reason]
 }
     "#;
     
@@ -238,9 +240,11 @@ Negotiation <Protocol>("a complex negotiation protocol with multiple rounds") {
     // Verify complex parameter types
     assert!(generated_code.contains("counter_offer: String"));
     assert!(generated_code.contains("final_decision: bool"));
+    assert!(generated_code.contains("mediation_id: String"));
     
     Ok(())
 }
+
 
 #[test]
 fn test_project_compilation_with_validation() -> Result<()> {
