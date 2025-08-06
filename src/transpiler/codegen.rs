@@ -1,7 +1,6 @@
 use crate::protocol::ast::{AstNode, AstNodeType};
 use anyhow::{anyhow, Result};
 use serde::Serialize;
-use crate::transpiler::composition::ProtocolRegistry;
 
 #[derive(Serialize)]
 struct Protocol {
@@ -54,15 +53,11 @@ struct ParameterFlow {
     parameter: String,
 }
 
-pub struct BmppCodeGenerator {
-    registry: ProtocolRegistry,
-}
+pub struct BmppCodeGenerator;
 
 impl BmppCodeGenerator {
     pub fn new() -> Self {
-        Self {
-            registry: ProtocolRegistry::new(),
-        }
+        Self
     }
     
     pub fn generate(&self, ast: &AstNode) -> Result<String> {
@@ -75,16 +70,10 @@ impl BmppCodeGenerator {
     fn generate_program(&self, ast: &AstNode) -> Result<String> {
         let mut protocols = Vec::new();
         
-        // First pass: collect all protocols
-        let mut registry = ProtocolRegistry::new();
-        self.collect_protocols(ast, &mut registry)?;
-        
-        // Second pass: process each protocol
+        // Process each protocol in the program
         for protocol_node in &ast.children {
             if protocol_node.node_type == AstNodeType::Protocol {
-                let mut protocol_copy = (**protocol_node).clone();
-                registry.resolve_protocol_references(&mut protocol_copy)?;
-                let protocol = self.process_protocol(&protocol_copy)?;
+                let protocol = self.process_protocol(protocol_node)?;
                 protocols.push(protocol);
             }
         }
@@ -94,25 +83,6 @@ impl BmppCodeGenerator {
         }
         
         self.generate_rust_code(&protocols)
-    }
-
-    fn collect_protocols(&self, node: &AstNode, registry: &mut ProtocolRegistry) -> Result<()> {
-        if node.node_type == AstNodeType::Protocol {
-            // Extract protocol name from ProtocolName child node
-            if let Some(protocol_name_node) = node.children.iter()
-                .find(|child| child.node_type == AstNodeType::ProtocolName) {
-                if let Some(name) = protocol_name_node.get_string("name") {
-                    registry.register_protocol(name.clone(), node.clone());
-                }
-            }
-        }
-        
-        // Recursively collect from children
-        for child in &node.children {
-            self.collect_protocols(child, registry)?;
-        }
-        
-        Ok(())
     }
 
     fn process_protocol(&self, node: &AstNode) -> Result<Protocol> {
@@ -278,16 +248,18 @@ impl BmppCodeGenerator {
         
         for child in &node.children {
             match child.node_type {
-                AstNodeType::Identifier => {
-                    if let Some(role_type) = child.get_string("role") {
-                        if let Some(name) = child.get_string("name") {
-                            match role_type.as_str() {
-                                "from" => from_role = name.clone(),
-                                "to" => to_role = name.clone(),
-                                "action" => action = name.clone(),
-                                _ => {}
-                            }
+                AstNodeType::RoleRef => {
+                    if let Some(name) = child.get_string("name") {
+                        if from_role == "Unknown" {
+                            from_role = name.clone();
+                        } else if to_role == "Unknown" {
+                            to_role = name.clone();
                         }
+                    }
+                }
+                AstNodeType::ActionName => {
+                    if let Some(name) = child.get_string("name") {
+                        action = name.clone();
                     }
                 }
                 AstNodeType::Annotation => {
@@ -378,19 +350,16 @@ impl BmppCodeGenerator {
         code.push_str("// Generated BMPP Protocol Implementation\n");
         code.push_str("use serde::{Serialize, Deserialize};\n");
         code.push_str("use std::collections::HashMap;\n");
-        code.push_str("use anyhow::Result;\n");
-        code.push_str("use std::sync::Arc;\n");
-        code.push_str("use std::marker::PhantomData;\n\n");
+        code.push_str("use anyhow::Result;\n\n");
         
         // Generate Agent struct first
         code.push_str("#[derive(Debug, Clone, Serialize, Deserialize)]\n");
-        code.push_str("pub struct Agent {\n    pub id: String,\n    pub name: String,\n}\n\n");
-        
-        // Generate protocol enactment trait
-        code.push_str("pub trait ProtocolEnactment<P, C> {\n");
-        code.push_str("    fn enact(&self, parent: &P, roles: &[String], params: &HashMap<String, String>) -> Result<C>;\n");
+        code.push_str("pub struct Agent {\n");
+        code.push_str("    pub id: String,\n");
+        code.push_str("    pub name: String,\n");
         code.push_str("}\n\n");
         
+        // Generate code for each protocol
         for protocol in protocols {
             code.push_str(&self.generate_protocol_code(protocol)?);
         }
@@ -432,6 +401,7 @@ impl BmppCodeGenerator {
         // Generate implementation
         code.push_str(&format!("impl {}Protocol {{\n", protocol.name));
         
+        // Generate constructor
         code.push_str("    pub fn new() -> Self {\n");
         code.push_str("        Self {\n");
         for role in &protocol.roles {
@@ -449,7 +419,8 @@ impl BmppCodeGenerator {
                 default_value
             ));
         }
-        code.push_str("        }\n    }\n\n");
+        code.push_str("        }\n");
+        code.push_str("    }\n\n");
         
         // Generate methods for each interaction
         for interaction in &protocol.interactions {
@@ -483,87 +454,66 @@ impl BmppCodeGenerator {
             }
         }
         
-        // Helper closure to get parameter type from protocol definition
-        let get_param_type = |param_name: &str| -> String {
-            protocol.parameters.iter()
-                .find(|p| p.name == param_name)
-                .map(|p| self.map_bmpp_type_to_rust(&p.param_type))
-                .unwrap_or("String")
-                .to_string()
-        };
+        // Generate method signature with proper types
+        let method_name = interaction.action.to_lowercase();
+        let mut signature = format!("    pub fn {}(&mut self", method_name);
         
-        // Helper closure to get default value for a parameter
-        let get_param_default = |param_name: &str| -> String {
-            protocol.parameters.iter()
-                .find(|p| p.name == param_name)
-                .map(|p| self.get_default_value(&p.param_type))
-                .unwrap_or("String::new()")
-                .to_string()
-        };
-        
-        // Generate function signature
-        let mut signature = format!("    pub fn {}(&mut self", interaction.action.to_lowercase());
-        
-        // Add input parameters to signature
+        // Add input parameters
         for input_param in &input_params {
-            let rust_type = get_param_type(input_param);
+            let rust_type = self.get_parameter_type(input_param, protocol);
             signature.push_str(&format!(", {}: {}", input_param.to_lowercase(), rust_type));
         }
         
-        // Determine return type based on output parameters
+        // Determine return type
         let return_type = match output_params.len() {
             0 => "Result<()>".to_string(),
             1 => {
-                let rust_type = get_param_type(&output_params[0]);
+                let rust_type = self.get_parameter_type(&output_params[0], protocol);
                 format!("Result<{}>", rust_type)
             }
             _ => {
-                let output_types: Vec<String> = output_params.iter()
-                    .map(|param| get_param_type(param))
+                let types: Vec<String> = output_params.iter()
+                    .map(|param| self.get_parameter_type(param, protocol))
                     .collect();
-                format!("Result<({})>", output_types.join(", "))
+                format!("Result<({})>", types.join(", "))
             }
         };
         
         signature.push_str(&format!(") -> {} {{", return_type));
         
-        // Generate method documentation and signature
-        code.push_str(&format!(
-            "    /// {}\n{}\n",
-            interaction.description,
-            signature
-        ));
-        
-        // Generate method body
-        code.push_str("        // Standard interaction implementation\n");
+        // Generate method
+        code.push_str(&format!("    /// {}\n", interaction.description));
+        code.push_str(&format!("{}\n", signature));
+        code.push_str("        // Protocol interaction implementation\n");
         code.push_str(&format!(
             "        println!(\"Executing interaction: {} -> {} ({})\");\n",
-            interaction.from_role,
-            interaction.to_role,
-            interaction.action
+            interaction.from_role, interaction.to_role, interaction.action
         ));
         
-        // Add comments for input parameters
+        // Log input parameters
         for input_param in &input_params {
             code.push_str(&format!(
-                "        println!(\"Input parameter {}: {{:?}}\", {});\n", 
-                input_param,
-                input_param.to_lowercase()
+                "        println!(\"Input parameter {}: {{:?}}\", {});\n",
+                input_param, input_param.to_lowercase()
             ));
         }
         
-        // Generate return statement
+        // Generate return value
         match output_params.len() {
             0 => code.push_str("        Ok(())\n"),
             1 => {
-                let default_value = get_param_default(&output_params[0]);
-                code.push_str(&format!("        Ok({})\n", default_value));
+                let default = self.get_parameter_default(&output_params[0], protocol);
+                code.push_str(&format!("        // Output parameter: {}\n", output_params[0]));
+                code.push_str(&format!("        Ok({})\n", default));
             }
             _ => {
-                let default_values: Vec<String> = output_params.iter()
-                    .map(|param| get_param_default(param))
+                let defaults: Vec<String> = output_params.iter()
+                    .map(|param| {
+                        code.push_str(&format!("        // Output parameter: {}\n", param));
+                        self.get_parameter_default(param, protocol)
+                    })
                     .collect();
-                code.push_str(&format!("        Ok(({}))\n", default_values.join(", ")));
+                code.push_str(&format!("        Ok(({}))\\n", defaults.join(", ")));
             }
         }
         
@@ -575,149 +525,56 @@ impl BmppCodeGenerator {
     fn generate_composition_method(&self, composition: &ProtocolComposition, protocol: &Protocol) -> Result<String> {
         let mut code = String::new();
         
-        // Collect input and output parameters
-        let mut input_params = Vec::new();
-        let mut output_params = Vec::new();
-        
-        for param in &composition.parameter_flows {
-            if param.direction == "in" {
-                input_params.push(&param.parameter);
-            } else if param.direction == "out" {
-                output_params.push(&param.parameter);
-            }
-        }
-        
-        // Helper closure to get parameter type from protocol definition
-        let get_param_type = |param_name: &str| -> String {
-            protocol.parameters.iter()
-                .find(|p| p.name == param_name)
-                .map(|p| self.map_bmpp_type_to_rust(&p.param_type))
-                .unwrap_or("String")
-                .to_string()
-        };
-        
-        // Generate function signature
         let method_name = format!("enact_{}", composition.protocol_name.to_lowercase());
-        let mut signature = format!("    pub fn {}(&mut self", method_name);
         
-        // Add input parameters to signature
-        for input_param in &input_params {
-            let rust_type = get_param_type(input_param);
-            signature.push_str(&format!(", {}: {}", input_param.to_lowercase(), rust_type));
-        }
-        
-        // Determine return type based on output parameters
-        let return_type = match output_params.len() {
-            0 => format!("Result<{}Protocol>", composition.protocol_name),
-            1 => {
-                let rust_type = get_param_type(&output_params[0]);
-                format!("Result<({}, {})>", rust_type, format!("{}Protocol", composition.protocol_name))
-            }
-            _ => {
-                let output_types: Vec<String> = output_params.iter()
-                    .map(|param| get_param_type(param))
-                    .collect();
-                format!("Result<({}, {})>", 
-                    output_types.join(", "), 
-                    format!("{}Protocol", composition.protocol_name))
-            }
-        };
-        
-        signature.push_str(&format!(") -> {} {{", return_type));
-        
-        // Generate method documentation and signature
+        // Generate method signature
         code.push_str(&format!(
-            "    /// Enacts the {} protocol with roles: {}\n{}\n",
+            "    /// Enacts the {} protocol with roles: {}\n",
             composition.protocol_name,
-            composition.roles.join(", "),
-            signature
+            composition.roles.join(", ")
         ));
         
-        // Generate method body
+        code.push_str(&format!("    pub fn {}(&mut self) -> Result<()> {{\n", method_name));
         code.push_str("        // Protocol composition enactment\n");
         code.push_str(&format!(
-            "        println!(\"Enacting protocol: {}\");\n",
-            composition.protocol_name
+            "        println!(\"Enacting protocol: {} with roles: {}]\");\n",
+            composition.protocol_name,
+            composition.roles.join(", ")
         ));
         
-        // Create role mapping
-        code.push_str("        let mut role_mapping = HashMap::new();\n");
-        for (index, role) in composition.roles.iter().enumerate() {
+        // Generate parameter flow logging
+        for param_flow in &composition.parameter_flows {
             code.push_str(&format!(
-                "        role_mapping.insert(\"{}\".to_string(), \"{}\".to_string());\n",
-                index, role
+                "        println!(\"Parameter flow: {} {}\");\n",
+                param_flow.direction, param_flow.parameter
             ));
         }
         
-        // Create parameter mapping
-        code.push_str("        let mut param_mapping = HashMap::new();\n");
-        for input_param in &input_params {
-            code.push_str(&format!(
-                "        param_mapping.insert(\"{}\".to_string(), format!(\"{{:?}}\", {}));\n",
-                input_param, input_param.to_lowercase()
-            ));
-        }
-        
-        // Create and configure child protocol
-        code.push_str(&format!(
-            "        let mut child_protocol = {}Protocol::new();\n",
-            composition.protocol_name
-        ));
-        
-        // Configure child protocol roles based on parent roles
-        for (index, role) in composition.roles.iter().enumerate() {
-            if index < composition.roles.len() {
-                code.push_str(&format!(
-                    "        child_protocol.{} = self.{}.clone();\n",
-                    role.to_lowercase(),
-                    role.to_lowercase()
-                ));
-            }
-        }
-        
-        // Set input parameters on child protocol
-        for input_param in &input_params {
-            code.push_str(&format!(
-                "        child_protocol.{} = {};\n",
-                input_param.to_lowercase(),
-                input_param.to_lowercase()
-            ));
-        }
-        
-        // Generate return statement
-        match output_params.len() {
-            0 => code.push_str("        Ok(child_protocol)\n"),
-            _ => {
-                // For now, return default values for output parameters along with child protocol
-                let default_values: Vec<String> = output_params.iter()
-                    .map(|param| {
-                        let default_string = "String".to_string();
-                        let param_type = protocol.parameters.iter()
-                            .find(|p| p.name == **param)
-                            .map(|p| &p.param_type)
-                            .unwrap_or(&default_string);
-                        self.get_default_value(param_type).to_string()
-                    })
-                    .collect();
-                
-                if output_params.len() == 1 {
-                    code.push_str(&format!("        Ok(({}, child_protocol))\n", default_values[0]));
-                } else {
-                    code.push_str(&format!("        Ok((({}, ), child_protocol))\n", default_values.join(", ")));
-                }
-            }
-        }
-        
+        code.push_str("        Ok(())\n");
         code.push_str("    }\n\n");
         
         Ok(code)
+    }
+    
+    fn get_parameter_type(&self, param_name: &str, protocol: &Protocol) -> String {
+        protocol.parameters.iter()
+            .find(|p| p.name == param_name)
+            .map(|p| self.map_bmpp_type_to_rust(&p.param_type).to_string())
+            .unwrap_or_else(|| "String".to_string())
+    }
+    
+    fn get_parameter_default(&self, param_name: &str, protocol: &Protocol) -> String {
+        protocol.parameters.iter()
+            .find(|p| p.name == param_name)
+            .map(|p| self.get_default_value(&p.param_type).to_string())
+            .unwrap_or_else(|| "String::new()".to_string())
     }
     
     fn map_bmpp_type_to_rust(&self, bmpp_type: &str) -> &str {
         match bmpp_type {
             "String" => "String",
             "Int" => "i32",
-            "Float" => "f64",
+            "Float" => "f64", 
             "Bool" => "bool",
             _ => "String",
         }

@@ -207,9 +207,25 @@ fn extract_standard_interaction(node: &AstNode) -> Result<InteractionInfo> {
     let mut action = "unknown_action".to_string();
     let mut parameter_flows = Vec::new();
     
+    // Extract roles and action name from children
     for child in &node.children {
         match child.node_type {
+            AstNodeType::RoleRef => {
+                if let Some(name) = child.get_string("name") {
+                    if from_role == "Unknown" {
+                        from_role = name.clone();
+                    } else if to_role == "Unknown" {
+                        to_role = name.clone();
+                    }
+                }
+            }
+            AstNodeType::ActionName => {
+                if let Some(name) = child.get_string("name") {
+                    action = name.clone();
+                }
+            }
             AstNodeType::Identifier => {
+                // Handle identifiers that may represent roles or actions
                 if let Some(role_type) = child.get_string("role") {
                     if let Some(name) = child.get_string("name") {
                         match role_type.as_str() {
@@ -218,6 +234,15 @@ fn extract_standard_interaction(node: &AstNode) -> Result<InteractionInfo> {
                             "action" => action = name.clone(),
                             _ => {}
                         }
+                    }
+                } else if let Some(name) = child.get_string("name") {
+                    // If no role type is specified, try to determine from context
+                    if from_role == "Unknown" {
+                        from_role = name.clone();
+                    } else if to_role == "Unknown" {
+                        to_role = name.clone();
+                    } else if action == "unknown_action" {
+                        action = name.clone();
                     }
                 }
             }
@@ -342,53 +367,145 @@ fn validate_causality(
     interactions: &[InteractionInfo],
     protocol_name: &str
 ) -> Result<()> {
-    // Build dependency graph between interactions
-    let mut interaction_deps: HashMap<String, HashSet<String>> = HashMap::new();
+    // Build precedence relations based on parameter dependencies
+    // An interaction A must precede interaction B if A produces a parameter that B consumes
+    let mut precedence_graph: HashMap<String, Vec<String>> = HashMap::new();
     
+    // Initialize graph with all interactions
     for interaction in interactions {
-        let mut deps = HashSet::new();
-        
-        // For each input parameter, find which interactions produce it
-        for flow in &interaction.parameter_flows {
-            if flow.direction == "in" {
-                if let Some(param_info) = parameters.get(&flow.parameter) {
-                    deps.extend(param_info.producers.iter().cloned());
-                }
-            }
-        }
-        
-        interaction_deps.insert(interaction.action.clone(), deps);
+        precedence_graph.insert(interaction.action.clone(), Vec::new());
     }
     
-    // Check for cycles in the dependency graph using DFS
-    let mut visited = HashSet::new();
-    let mut rec_stack = HashSet::new();
-    
+    // Build precedence relationships
     for interaction in interactions {
-        if !visited.contains(&interaction.action) {
-            let mut path = Vec::new();
-            if has_cycle_dfs(&interaction.action, &interaction_deps, &mut visited, &mut rec_stack, &mut path) {
-                // Construct cycle path for error message
-                if let Some(cycle_start) = path.iter().position(|x| x == &interaction.action) {
-                    let cycle_path = &path[cycle_start..];
-                    return Err(anyhow!(
-                        "Circular dependency detected in protocol '{}': {} -> {} - BSPL causality violation",
-                        protocol_name,
-                        cycle_path.join(" -> "),
-                        cycle_path[0]
-                    ));
-                } else {
-                    return Err(anyhow!(
-                        "Circular dependency detected in protocol '{}': {} - BSPL causality violation",
-                        protocol_name,
-                        path.join(" -> ")
-                    ));
+        for flow in &interaction.parameter_flows {
+            if flow.direction == "in" {
+                // This interaction consumes a parameter
+                // Find all interactions that produce this parameter
+                if let Some(param_info) = parameters.get(&flow.parameter) {
+                    for producer in &param_info.producers {
+                        if producer != &interaction.action {
+                            // Producer must precede this consumer
+                            precedence_graph
+                                .entry(producer.clone())
+                                .or_default()
+                                .push(interaction.action.clone());
+                        }
+                    }
                 }
             }
         }
+    }
+    
+    // Check for cycles using topological sort approach
+    let mut in_degree: HashMap<String, usize> = HashMap::new();
+    let mut ordered_interactions = Vec::new();
+    
+    // Calculate in-degrees
+    for interaction in interactions {
+        in_degree.insert(interaction.action.clone(), 0);
+    }
+    
+    for successors in precedence_graph.values() {
+        for successor in successors {
+            *in_degree.get_mut(successor).unwrap() += 1;
+        }
+    }
+    
+    // Start with interactions that have no dependencies
+    let mut queue: Vec<String> = in_degree
+        .iter()
+        .filter(|(_, degree)| **degree == 0)
+        .map(|(action, _)| action.clone())
+        .collect();
+    
+    // Process queue
+    while let Some(current) = queue.pop() {
+        ordered_interactions.push(current.clone());
+        
+        // Reduce in-degree for all successors
+        if let Some(successors) = precedence_graph.get(&current) {
+            for successor in successors {
+                if let Some(degree) = in_degree.get_mut(successor) {
+                    *degree -= 1;
+                    if *degree == 0 {
+                        queue.push(successor.clone());
+                    }
+                }
+            }
+        }
+    }
+    
+    // If we couldn't order all interactions, there's a cycle
+    if ordered_interactions.len() != interactions.len() {
+        // Find the cycle for error reporting
+        let remaining: Vec<String> = interactions
+            .iter()
+            .map(|i| i.action.clone())
+            .filter(|action| !ordered_interactions.contains(action))
+            .collect();
+        
+        // Build cycle path for better error message
+        let cycle_path = find_cycle_path(&precedence_graph, &remaining);
+        
+        return Err(anyhow!(
+            "Circular dependency detected in protocol '{}': {} - BSPL causality violation",
+            protocol_name,
+            cycle_path
+        ));
     }
     
     Ok(())
+}
+
+fn find_cycle_path(graph: &HashMap<String, Vec<String>>, remaining_nodes: &[String]) -> String {
+    if remaining_nodes.is_empty() {
+        return "unknown cycle".to_string();
+    }
+    
+    let mut visited = HashSet::new();
+    let mut path = Vec::new();
+    
+    // Start DFS from first remaining node
+    if let Some(cycle) = dfs_find_cycle(&remaining_nodes[0], graph, &mut visited, &mut path) {
+        return cycle.join(" -> ");
+    }
+    
+    // Fallback: just show the problematic interactions
+    remaining_nodes.join(" -> ")
+}
+
+fn dfs_find_cycle(
+    node: &str,
+    graph: &HashMap<String, Vec<String>>,
+    visited: &mut HashSet<String>,
+    path: &mut Vec<String>
+) -> Option<Vec<String>> {
+    if path.contains(&node.to_string()) {
+        // Found a cycle - return the cycle part
+        let cycle_start = path.iter().position(|n| n == node).unwrap();
+        let mut cycle = path[cycle_start..].to_vec();
+        cycle.push(node.to_string());
+        return Some(cycle);
+    }
+    
+    if visited.contains(node) {
+        return None;
+    }
+    
+    visited.insert(node.to_string());
+    path.push(node.to_string());
+    
+    if let Some(successors) = graph.get(node) {
+        for successor in successors {
+            if let Some(cycle) = dfs_find_cycle(successor, graph, visited, path) {
+                return Some(cycle);
+            }
+        }
+    }
+    
+    path.pop();
+    None
 }
 
 /// Validates protocol completeness according to BSPL
@@ -513,36 +630,6 @@ fn validate_enactability(
     }
     
     Ok(())
-}
-
-fn has_cycle_dfs(
-    current: &str,
-    deps: &HashMap<String, HashSet<String>>,
-    visited: &mut HashSet<String>,
-    rec_stack: &mut HashSet<String>,
-    path: &mut Vec<String>
-) -> bool {
-    visited.insert(current.to_string());
-    rec_stack.insert(current.to_string());
-    path.push(current.to_string());
-    
-    if let Some(dependencies) = deps.get(current) {
-        for dep in dependencies {
-            if !visited.contains(dep) {
-                if has_cycle_dfs(dep, deps, visited, rec_stack, path) {
-                    return true;
-                }
-            } else if rec_stack.contains(dep) {
-                // Found a back edge - cycle detected
-                path.push(dep.clone());
-                return true;
-            }
-        }
-    }
-    
-    rec_stack.remove(current);
-    path.pop();
-    false
 }
 
 /// Determines if a parameter represents pre-protocol knowledge

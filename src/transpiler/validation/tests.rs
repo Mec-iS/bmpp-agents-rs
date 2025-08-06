@@ -24,9 +24,7 @@ Purchase <Protocol>("test pre-protocol knowledge emission") {
 
         let ast = parse_source(bmpp_source)?;
         let result = validate_parameter_flow(&ast);
-        
         assert!(result.is_ok(), "Pre-protocol knowledge emission should be valid: {:?}", result);
-        
         Ok(())
     }
 
@@ -49,12 +47,13 @@ BadProtocol <Protocol>("protocol with circular dependency") {
 
         let ast = parse_source(bmpp_source).unwrap();
         let result = validate_parameter_flow(&ast);
-        
         assert!(result.is_err(), "Circular dependency should be detected");
         
         let error_msg = result.unwrap_err().to_string();
-        assert!(error_msg.contains("Circular dependency detected"), 
+        assert!(error_msg.contains("Circular dependency detected"),
                "Error should mention circular dependency, got: {}", error_msg);
+        assert!(error_msg.contains("action1") || error_msg.contains("action2"),
+               "Error should contain actual action names, got: {}", error_msg);
     }
 
     #[test]
@@ -76,11 +75,10 @@ MultiProducerProtocol <Protocol>("protocol with multiple producers") {
 
         let ast = parse_source(bmpp_source).unwrap();
         let result = validate_parameter_flow(&ast);
-        
         assert!(result.is_err(), "Multiple producers should be detected");
         
         let error_msg = result.unwrap_err().to_string();
-        assert!(error_msg.contains("multiple interactions") || error_msg.contains("BSPL safety violation"), 
+        assert!(error_msg.contains("multiple interactions") || error_msg.contains("BSPL safety violation"),
                "Error should mention multiple producers or BSPL violation, got: {}", error_msg);
     }
 
@@ -103,9 +101,7 @@ UnusedParamProtocol <Protocol>("protocol with unused parameters") {
 
         let ast = parse_source(bmpp_source)?;
         let result = validate_parameter_flow(&ast);
-        
         assert!(result.is_ok(), "Unused parameters should not fail validation: {:?}", result);
-        
         Ok(())
     }
 
@@ -126,11 +122,10 @@ NoProducerProtocol <Protocol>("protocol with consumer but no producer") {
 
         let ast = parse_source(bmpp_source).unwrap();
         let result = validate_parameter_flow(&ast);
-        
         assert!(result.is_err(), "Consumer without producer should be detected");
         
         let error_msg = result.unwrap_err().to_string();
-        assert!(error_msg.contains("consumed but never produced") || error_msg.contains("BSPL completeness violation"), 
+        assert!(error_msg.contains("consumed but never produced") || error_msg.contains("BSPL completeness violation"),
                "Error should mention missing producer or BSPL violation, got: {}", error_msg);
     }
 
@@ -151,9 +146,7 @@ IDProtocol <Protocol>("protocol with special ID parameter handling") {
 
         let ast = parse_source(bmpp_source)?;
         let result = validate_parameter_flow(&ast);
-        
         assert!(result.is_ok(), "ID parameter should be handled specially: {:?}", result);
-        
         Ok(())
     }
 
@@ -174,11 +167,10 @@ UndeclaredParamProtocol <Protocol>("protocol using undeclared parameter") {
 
         let ast = parse_source(bmpp_source).unwrap();
         let result = validate_parameter_flow(&ast);
-        
         assert!(result.is_err(), "Undeclared parameter usage should be detected");
         
         let error_msg = result.unwrap_err().to_string();
-        assert!(error_msg.contains("is not declared"), 
+        assert!(error_msg.contains("is not declared"),
                "Error should mention undeclared parameter, got: {}", error_msg);
     }
 
@@ -209,24 +201,22 @@ ComplexValidProtocol <Protocol>("complex but valid protocol") {
 
         let ast = parse_source(bmpp_source)?;
         let result = validate_parameter_flow(&ast);
-        
         assert!(result.is_ok(), "Complex valid protocol should pass validation: {:?}", result);
-        
         Ok(())
     }
 
     #[test]
     fn test_parameter_direction_validation() {
         let bmpp_source = r#"
-InvalidDirectionProtocol <Protocol>("protocol with invalid direction") {
+InvalidDirectionProtocol ("protocol with invalid direction") {
     roles
-        A <Agent>("agent A"),
-        B <Agent>("agent B")
+        A ("agent A"),
+        B ("agent B")
     
     parameters
-        param1 <String>("test parameter")
+        param1 ("test parameter")
     
-    A -> B: action1 <Action>("action with invalid direction")[invalid param1]
+    A -> B: action1 ("action with invalid direction")[invalid param1]
 }
         "#;
 
@@ -234,8 +224,8 @@ InvalidDirectionProtocol <Protocol>("protocol with invalid direction") {
         assert!(result.is_err(), "Invalid parameter direction should be caught by parser");
         
         let error_msg = result.unwrap_err().to_string();
-        assert!(error_msg.contains("expected") || error_msg.contains("Direction"), 
-            "Error should mention parsing issue or Direction, got: {}", error_msg);
+        assert!(error_msg.contains("expected") || error_msg.contains("Direction"),
+               "Error should mention parsing issue or Direction, got: {}", error_msg);
     }
 
     #[test]
@@ -255,16 +245,14 @@ EmptyFlowProtocol <Protocol>("protocol with empty parameter flow") {
 
         let ast = parse_source(bmpp_source)?;
         let result = validate_parameter_flow(&ast);
-        
         assert!(result.is_ok(), "Empty parameter flow should be valid: {:?}", result);
-        
         Ok(())
     }
 
     #[test]
     fn test_causality_chain_validation() -> Result<()> {
         let bmpp_source = r#"
-CausalityChainProtocol <Protocol>("protocol with causality chain") {
+CausalityChainProtocol <Protocol>("protocol with proper causality chain") {
     roles
         A <Agent>("agent A"),
         B <Agent>("agent B"),
@@ -275,21 +263,85 @@ CausalityChainProtocol <Protocol>("protocol with causality chain") {
         intermediate <String>("intermediate value"),
         output <String>("final output")
     
-    A -> B: step1 <Action>("first step")[out input]
-    B -> C: step2 <Action>("second step")[in input, out intermediate]
-    C -> A: step3 <Action>("final step")[in intermediate, out output]
+    A -> B: step1 <Action>("first step - A provides input to B")[out input]
+    B -> C: step2 <Action>("second step - B processes input and provides intermediate to C")[in input, out intermediate]
+    C -> A: step3 <Action>("final step - C processes intermediate and provides output to A")[in intermediate, out output]
 }
         "#;
 
         let ast = parse_source(bmpp_source)?;
         let result = validate_parameter_flow(&ast);
-        
         assert!(result.is_ok(), "Valid causality chain should pass validation: {:?}", result);
+        
+        if let Ok(_) = result {
+            println!("✅ Causality chain validation passed");
+            println!("Execution order: step1 (A->B) → step2 (B->C) → step3 (C->A)");
+            println!("Parameter flow: input → intermediate → output");
+        }
         
         Ok(())
     }
 
-    // New tests for enhanced BSPL validation
+    #[test]
+    fn test_causality_violation_detection() -> Result<()> {
+        let bmpp_source = r#"
+    CausalityViolationProtocol <Protocol>("protocol with causality violation") {
+        roles
+            A <Agent>("agent A"),
+            B <Agent>("agent B")
+        
+        parameters
+            param1 <String>("parameter 1"),
+            param2 <String>("parameter 2")
+        
+        A -> B: action1 <Action>("action that needs param2")[in param2, out param1]
+        B -> A: action2 <Action>("action that needs param1")[in param1, out param2]
+    }
+        "#;
+
+        let ast = parse_source(bmpp_source)?;
+        let result = validate_parameter_flow(&ast);
+        assert!(result.is_err(), "Circular dependency should be detected as causality violation");
+        
+        if let Err(e) = result {
+            println!("✅ Causality violation correctly detected: {}", e);
+            assert!(e.to_string().contains("causality") || e.to_string().contains("Circular dependency"));
+            assert!(e.to_string().contains("action1") || e.to_string().contains("action2"),
+                   "Error should contain actual action names, got: {}", e);
+        }
+        
+        Ok(())
+    }
+
+    #[test]
+    fn test_valid_parallel_causality() -> Result<()> {
+        let bmpp_source = r#"
+ParallelProtocol <Protocol>("protocol with parallel causality") {
+    roles
+        Initiator <Agent>("starts the process"),
+        ProcessorA <Agent>("processes branch A"),
+        ProcessorB <Agent>("processes branch B"),
+        Collector <Agent>("collects results")
+    
+    parameters
+        input <String>("initial input"),
+        resultA <String>("result from branch A"),
+        resultB <String>("result from branch B"),
+        final_output <String>("combined final output")
+    
+    Initiator -> ProcessorA: startA <Action>("start branch A")[out input]
+    Initiator -> ProcessorB: startB <Action>("start branch B")[out input]
+    ProcessorA -> Collector: finishA <Action>("complete branch A")[in input, out resultA]
+    ProcessorB -> Collector: finishB <Action>("complete branch B")[in input, out resultB]
+    Collector -> Initiator: combine <Action>("combine results")[in resultA, in resultB, out final_output]
+}
+        "#;
+
+        let ast = parse_source(bmpp_source)?;
+        let result = validate_parameter_flow(&ast);
+        assert!(result.is_ok(), "Valid parallel causality should pass validation: {:?}", result);
+        Ok(())
+    }
 
     #[test]
     fn test_protocol_composition_validation() -> Result<()> {
@@ -321,9 +373,12 @@ SubProtocol <Protocol>("sub protocol") {
         "#;
 
         let ast = parse_source(bmpp_source)?;
-        let result = validate_parameter_flow(&ast);
-        assert!(result.is_err(), "Never consumed parameter should not pass: {:?}", result);
         
+        // The main protocol validation should fail because 'result' is never consumed
+        let result = validate_parameter_flow(&ast);
+        assert!(result.is_err(), "Protocol with unused output parameter should fail validation: {:?}", result);
+        
+        // But composition validation should pass
         let comp_result = validate_protocol_composition(&ast);
         assert!(comp_result.is_ok(), "Protocol composition validation should pass: {:?}", comp_result);
         
@@ -347,11 +402,10 @@ MainProtocol <Protocol>("protocol with invalid reference") {
 
         let ast = parse_source(bmpp_source).unwrap();
         let result = validate_protocol_composition(&ast);
-        
         assert!(result.is_err(), "Invalid protocol reference should be detected");
         
         let error_msg = result.unwrap_err().to_string();
-        assert!(error_msg.contains("unknown protocol"), 
+        assert!(error_msg.contains("unknown protocol"),
                "Error should mention unknown protocol, got: {}", error_msg);
     }
 
@@ -373,11 +427,10 @@ RecursiveProtocol <Protocol>("self-referencing protocol") {
 
         let ast = parse_source(bmpp_source).unwrap();
         let result = validate_protocol_composition(&ast);
-        
         assert!(result.is_err(), "Self-referencing protocol should be detected");
         
         let error_msg = result.unwrap_err().to_string();
-        assert!(error_msg.contains("cannot reference itself"), 
+        assert!(error_msg.contains("cannot reference itself"),
                "Error should mention self-reference, got: {}", error_msg);
     }
 
@@ -403,9 +456,7 @@ EnactableProtocol <Protocol>("protocol testing enactability") {
 
         let ast = parse_source(bmpp_source)?;
         let result = validate_parameter_flow(&ast);
-        
         assert!(result.is_ok(), "Enactable protocol should pass validation: {:?}", result);
-        
         Ok(())
     }
 
@@ -431,8 +482,12 @@ UnreachableProtocol <Protocol>("protocol with potentially unreachable interactio
         let ast = parse_source(bmpp_source)?;
         let result = validate_parameter_flow(&ast);
         
-        // This should pass validation but may generate warnings about unreachable interactions
+        // This should fail validation because 'orphan' is never produced and is not a pre-protocol parameter
         assert!(result.is_err(), "Protocol with unreachable interaction should not be valid: {:?}", result);
+        
+        let error_msg = result.unwrap_err().to_string();
+        assert!(error_msg.contains("consumed but never produced") || error_msg.contains("completeness"),
+               "Error should mention missing producer, got: {}", error_msg);
         
         Ok(())
     }
@@ -457,8 +512,12 @@ IncompleteProtocol <Protocol>("protocol with completeness issues") {
         let ast = parse_source(bmpp_source)?;
         let result = validate_parameter_flow(&ast);
         
-        // Should pass validation but generate completeness warnings
+        // Should fail validation because 'input' is consumed but never produced (and is not a pre-protocol parameter)
         assert!(result.is_err(), "Incomplete protocol should not pass basic validation: {:?}", result);
+        
+        let error_msg = result.unwrap_err().to_string();
+        assert!(error_msg.contains("consumed but never produced") || error_msg.contains("completeness"),
+               "Error should mention completeness violation, got: {}", error_msg);
         
         Ok(())
     }
@@ -490,9 +549,66 @@ ComplexCausalityProtocol <Protocol>("protocol with complex causality") {
 
         let ast = parse_source(bmpp_source)?;
         let result = validate_parameter_flow(&ast);
-        
         assert!(result.is_ok(), "Complex causality should be handled correctly: {:?}", result);
+        Ok(())
+    }
+
+    #[test]
+    fn test_action_name_resolution_in_errors() {
+        let bmpp_source = r#"
+ActionNameTestProtocol <Protocol>("protocol to test action name resolution in errors") {
+    roles
+        A <Agent>("agent A"),
+        B <Agent>("agent B"),
+        C <Agent>("agent C")
+    
+    parameters
+        param1 <String>("parameter 1"),
+        param2 <String>("parameter 2"),
+        param3 <String>("parameter 3")
+    
+    A -> B: step_one <Action>("first step")[in param3, out param1]
+    B -> C: step_two <Action>("second step")[in param1, out param2]
+    C -> A: step_three <Action>("third step")[in param2, out param3]
+}
+        "#;
+
+        let ast = parse_source(bmpp_source).unwrap();
+        let result = validate_parameter_flow(&ast);
+        assert!(result.is_err(), "Circular dependency should be detected");
         
+        let error_msg = result.unwrap_err().to_string();
+        assert!(!error_msg.contains("unknown_action"), 
+               "Error should not contain 'unknown_action', got: {}", error_msg);
+        assert!(error_msg.contains("step_one") || error_msg.contains("step_two") || error_msg.contains("step_three"),
+               "Error should contain actual action names, got: {}", error_msg);
+    }
+
+    #[test]
+    fn test_valid_linear_protocol_with_multiple_parameters() -> Result<()> {
+        let bmpp_source = r#"
+LinearMultiParamProtocol <Protocol>("linear protocol with multiple parameters per interaction") {
+    roles
+        Client <Agent>("client role"),
+        Server <Agent>("server role"),
+        Database <Agent>("database role")
+    
+    parameters
+        user_id <String>("user identifier"),
+        query <String>("database query"),
+        auth_token <String>("authentication token"),
+        results <String>("query results"),
+        formatted_response <String>("formatted response")
+    
+    Client -> Server: authenticate <Action>("authenticate user")[out user_id, out auth_token]
+    Server -> Database: query_db <Action>("query database")[in user_id, in auth_token, out query, out results]
+    Database -> Client: respond <Action>("send formatted response")[in query, in results, out formatted_response]
+}
+        "#;
+
+        let ast = parse_source(bmpp_source)?;
+        let result = validate_parameter_flow(&ast);
+        assert!(result.is_ok(), "Valid linear protocol with multiple parameters should pass: {:?}", result);
         Ok(())
     }
 }
