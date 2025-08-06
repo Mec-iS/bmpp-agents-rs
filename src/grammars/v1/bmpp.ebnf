@@ -1,0 +1,106 @@
+(* BMPP - Blindly Meaningful Prompting Protocol Grammar *)
+(* Based on BSPL principles with natural language annotations *)
+
+(* ===== LEXICAL RULES ===== *)
+
+WHITESPACE      = { " " | "\t" | "\n" | "\r" } ;
+IDENTIFIER      = LETTER , { LETTER | DIGIT | "_" } ;
+STRING_LITERAL  = '"' , { ANY_CHAR - '"' } , '"' ;
+LETTER          = "A" | "B" | ... | "Z" | "a" | "b" | ... | "z" ;
+DIGIT           = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" ;
+ANY_CHAR        = ? any unicode character ? ;
+
+(* ===== SEMANTIC TAGS ===== *)
+
+PROTOCOL_TAG    = "<Protocol>" ;
+AGENT_TAG       = "<Agent>" ;
+ACTION_TAG      = "<Action>" ;
+ENACTMENT_TAG   = "<Enactment>" ;
+
+(* ===== BASIC TYPES ===== *)
+
+BasicType       = "String" | "Int" | "Float" | "Bool" ;
+Direction       = "in" | "out" ;
+
+(* ===== CORE GRAMMAR RULES ===== *)
+
+Program         = Protocol , { Protocol } ;
+
+Protocol        = ProtocolName , PROTOCOL_TAG , Annotation , "{" ,
+                  RolesSection ,
+                  ParametersSection ,
+                  InteractionSection ,
+                  "}" ;
+
+ProtocolName    = IDENTIFIER ;
+
+(* ===== ANNOTATIONS ===== *)
+(* Annotations provide semantic meaning in natural language *)
+
+Annotation      = "(" , STRING_LITERAL , ")" ;
+
+(* ===== ROLES SECTION ===== *)
+(* Defines participating agents in the protocol *)
+
+RolesSection    = "roles" ,
+                  RoleDecl , { "," , RoleDecl } ;
+
+RoleDecl        = IDENTIFIER , AGENT_TAG , Annotation ;
+
+(* ===== PARAMETERS SECTION ===== *)
+(* Defines typed data exchanged in the protocol *)
+
+ParametersSection = "parameters" ,
+                    ParameterDecl , { "," , ParameterDecl } ;
+
+ParameterDecl   = IDENTIFIER , "<" , BasicType , ">" , Annotation ;
+
+(* ===== INTERACTIONS SECTION ===== *)
+(* Defines message flows and protocol compositions *)
+
+InteractionSection = InteractionItem , { InteractionItem } ;
+
+InteractionItem = StandardInteraction | ProtocolComposition ;
+
+(* Standard peer-to-peer interaction *)
+StandardInteraction = RoleRef , "->" , RoleRef , ":" , ActionName ,
+                       ACTION_TAG , Annotation ,
+                       "[" , [ ParameterFlowList ] , "]" ;
+
+(* Protocol composition for hierarchical protocols *)
+ProtocolComposition = ProtocolReference ,
+                      "[" , [ CompositionParameterList ] , "]" ;
+
+ProtocolReference = IDENTIFIER , ENACTMENT_TAG ;
+
+(* ===== PARAMETER FLOWS ===== *)
+(* Defines data flow directions in interactions *)
+
+ParameterFlowList = ParameterFlow , { "," , ParameterFlow } ;
+
+ParameterFlow   = Direction , IDENTIFIER ;
+
+(* ===== COMPOSITION PARAMETERS ===== *)
+(* Mixed role identifiers and parameter flows for composition *)
+
+CompositionParameterList = CompositionParameter , 
+                          { "," , CompositionParameter } ;
+
+CompositionParameter = ParameterFlow | IDENTIFIER ;
+
+(* ===== REFERENCES ===== *)
+
+RoleRef         = IDENTIFIER ;
+ActionName      = IDENTIFIER ;
+
+(* ===== SEMANTIC CONSTRAINTS (Informal) ===== *)
+(*
+1. BSPL Safety: Each parameter has at most one producer
+2. BSPL Completeness: Parameters with consumers must have producers
+3. BSPL Causality: No circular dependencies between interactions
+4. BSPL Enactability: All interactions must be executable by their roles
+5. Composition Validity: Referenced protocols must exist
+6. Type Consistency: Parameter types must match across references
+7. Role Consistency: All referenced roles must be declared
+8. Annotation Requirement: All elements must have semantic descriptions
+*)

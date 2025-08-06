@@ -141,9 +141,8 @@ ValidPurchase <Protocol>("BSPL-compliant purchase protocol") {
 }
 
 #[test]
-fn test_parameter_flow_directions_enforced() -> Result<()> {
-    // Test that parameter flow directions are properly enforced
-    let protocol = r#"
+fn test_parameter_flow_directions() {
+    let source = r#"
 DirectionsTest <Protocol>("test parameter flow directions") {
     roles
         Producer <Agent>("produces parameters"),
@@ -157,26 +156,58 @@ DirectionsTest <Protocol>("test parameter flow directions") {
 }
     "#;
 
-    let ast = parse_source(protocol)?;
+    use bmpp_agents::protocol::ast::AstNodeType;
+
+    let result = parse_source(source);
+    assert!(result.is_ok(), "Should parse successfully: {:?}", result);
     
-    // Get the interaction to verify directions
+    let ast = result.unwrap();
+    println!("DEBUG: AST {}", ast);
+
+    // Get the protocol using accessor methods
     let protocol_node = &ast.children[0];
-    let interactions_section = &protocol_node.children[2];
-    let interaction = &interactions_section.children[0];
-    let param_flow = &interaction.children[0];
+    assert_eq!(protocol_node.node_type, AstNodeType::Protocol);
     
-    // Verify we have the expected parameter flows
-    assert_eq!(param_flow.children.len(), 2);
+    // Get the interactions section safely
+    let interactions_section = protocol_node.get_interactions_section()
+        .expect("Protocol should have an interactions section");
+    println!("DEBUG: interactions_section {}", interactions_section);
     
-    // Check directions
-    let first_param = &param_flow.children[0];
-    let second_param = &param_flow.children[1];
+    // Get the interaction items
+    let interaction_items = interactions_section.get_interaction_items();
+    assert_eq!(interaction_items.len(), 1, "Should have exactly one interaction");
     
-    assert_eq!(first_param.get_string("direction").unwrap(), "out");
-    assert_eq!(first_param.get_string("parameter").unwrap(), "produced_param");
+    let interaction_item = interaction_items[0];
+    println!("DEBUG: interaction_item {}", interaction_item);
     
-    assert_eq!(second_param.get_string("direction").unwrap(), "in"); 
-    assert_eq!(second_param.get_string("parameter").unwrap(), "consumed_param");
+    // Get the standard interaction
+    let standard_interaction = interaction_item.get_standard_interaction()
+        .expect("Interaction item should contain a standard interaction");
+    println!("DEBUG: standard_interaction {}", standard_interaction);
     
-    Ok(())
+    // Get interaction information using the helper method
+    let interaction_info = standard_interaction.get_standard_interaction_info()
+        .expect("Should be able to extract interaction info");
+    
+    assert_eq!(interaction_info.from_role, "Producer");
+    assert_eq!(interaction_info.to_role, "Consumer");
+    assert_eq!(interaction_info.action_name, "transfer");
+    assert_eq!(interaction_info.parameter_flows.len(), 2);
+    
+    // Verify parameter flow directions
+    let out_flows: Vec<_> = interaction_info.parameter_flows.iter()
+        .filter(|(direction, _)| direction == "out")
+        .collect();
+    let in_flows: Vec<_> = interaction_info.parameter_flows.iter()
+        .filter(|(direction, _)| direction == "in")
+        .collect();
+    
+    assert_eq!(out_flows.len(), 1, "Should have exactly one out parameter");
+    assert_eq!(in_flows.len(), 1, "Should have exactly one in parameter");
+    
+    assert_eq!(out_flows[0].1, "produced_param");
+    assert_eq!(in_flows[0].1, "consumed_param");
+    
+    println!("✅ Parameter flow directions are correctly enforced");
 }
+

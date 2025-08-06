@@ -58,7 +58,7 @@ JokeProtocol <Protocol>("a protocol for generating humorous content") {
     
     // Verify parameters section contains the joke parameter
     let params_section = protocol.children.iter()
-        .find(|child| child.node_type == bmpp_agents::utils::ast::AstNodeType::ParametersSection)
+        .find(|child| child.node_type == bmpp_agents::protocol::ast::AstNodeType::ParametersSection)
         .expect("Parameters section should exist");
     
     let joke_param = params_section.children.iter()

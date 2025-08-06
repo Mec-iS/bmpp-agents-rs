@@ -1,82 +1,47 @@
-Program = { SOI ~ Protocol* ~ EOI }
+WHITESPACE = _{ " " | "\t" | "\n" | "\r" }
 
-Protocol = {
-    ProtocolName ~ "<" ~ "Protocol" ~ ">" ~ Annotation ~ "{" ~
-    RolesSection ~
-    ParametersSection ~
-    InteractionSection ~
-    "}"
-}
+Program = { SOI ~ Protocol+ ~ EOI }
+
+Protocol = { ProtocolName ~ "<Protocol>" ~ Annotation ~ "{" ~ RolesSection ~ ParametersSection ~ InteractionSection ~ "}" }
 
 ProtocolName = { Identifier }
 
-// --- Annotations (mandatory parentheses) ---
-Annotation = { "(" ~ StringLiteral ~ ")" }
+RolesSection = { "roles" ~ RoleDecl ~ ("," ~ RoleDecl)* }
 
-// --- Roles Section ---
-RolesSection = {
-    "roles" ~
-    RoleDecl ~ ("," ~ RoleDecl)*
-}
+RoleDecl = { Identifier ~ "<Agent>" ~ Annotation }
 
-RoleDecl = {
-    Identifier ~ "<" ~ "Agent" ~ ">" ~ Annotation
-}
+ParametersSection = { "parameters" ~ ParameterDecl ~ ("," ~ ParameterDecl)* }
 
-// --- Parameters Section ---
-ParametersSection = {
-    "parameters" ~
-    ParameterDecl ~ ("," ~ ParameterDecl)*
-}
+ParameterDecl = { Identifier ~ "<" ~ BasicType ~ ">" ~ Annotation }
 
-ParameterDecl = {
-    Identifier ~ "<" ~ BasicType ~ ">" ~ Annotation
-}
+InteractionSection = { InteractionItem+ }
 
-// --- Interactions Section ---
-InteractionSection = {
-    Interaction+
-}
+InteractionItem = { StandardInteraction | ProtocolComposition }
 
-Interaction = {
-    RoleRef ~ "->" ~ RoleRef ~ ":" ~ ActionName ~ "<" ~ "Action" ~ ">" ~ 
-    Annotation ~ "[" ~ ParameterFlowList ~ "]"
-}
+StandardInteraction = { RoleRef ~ "->" ~ RoleRef ~ ":" ~ ActionName ~ "<Action>" ~ Annotation ~ "[" ~ ParameterFlowList? ~ "]" }
 
-ParameterFlowList = {
-    ParameterFlow ~ ("," ~ ParameterFlow)*
-    | ""  // Allow empty parameter flow
-}
+ProtocolComposition = { ProtocolReference ~ "[" ~ CompositionParameterList? ~ "]" }
 
-ParameterFlow = {
-    Direction ~ Identifier
-}
+ProtocolReference = { Identifier ~ "<Enactment>" }
+
+CompositionParameterList = { CompositionParameter ~ ("," ~ CompositionParameter)* }
+
+CompositionParameter = { (Direction ~ Identifier) | Identifier }
+
+ParameterFlowList = { ParameterFlow ~ ("," ~ ParameterFlow)* }
+
+ParameterFlow = { Direction ~ Identifier }
 
 Direction = { "in" | "out" }
 
-// --- Basic Types ---
-BasicType = { 
-    "String" | "Float" | "Bool" | "Int" 
-}
-
-// --- References ---
 RoleRef = { Identifier }
+
 ActionName = { Identifier }
 
-// --- Identifiers and Literals ---
+BasicType = { "String" | "Int" | "Float" | "Bool" }
+
+Annotation = { "(" ~ StringLiteral ~ ")" }
+
+StringLiteral = @{ "\"" ~ (!"\"" ~ ANY)* ~ "\"" }
+
 Identifier = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* }
-
-StringLiteral = ${ "\"" ~ StringInner ~ "\"" }
-StringInner = @{ StringChar* }
-StringChar = {
-    !("\"" | "\\") ~ ANY
-    | "\\" ~ ("\"" | "\\" | "/" | "b" | "f" | "n" | "r" | "t")
-    | "\\" ~ ("u" ~ ASCII_HEX_DIGIT{4})
-}
-
-// --- Whitespace and Comments ---
-WHITESPACE = _{ " " | "\t" | "\r" | "\n" }
-COMMENT = _{ 
-    "//" ~ (!"\n" ~ ANY)* ~ "\n"?
-    | "/*" ~ (!"*/" ~ ANY)* ~ "*/"
-}
