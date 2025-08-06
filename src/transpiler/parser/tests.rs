@@ -32,8 +32,12 @@ SecondProtocol <Protocol>("Second protocol description") {
         "#;
 
         let result = parse_source(source);
-        assert!(result.is_ok(), "Should parse multiple protocols: {:?}", result);
-        
+        assert!(
+            result.is_ok(),
+            "Should parse multiple protocols: {:?}",
+            result
+        );
+
         let ast = result.unwrap();
         assert_eq!(ast.node_type, AstNodeType::Program);
         assert_eq!(ast.children.len(), 2, "Should have exactly 2 protocols");
@@ -59,7 +63,11 @@ MainProtocol <Protocol>("Protocol with complex composition") {
         "#;
 
         let result = parse_source(source);
-        assert!(result.is_ok(), "Should parse composition with mixed parameters: {:?}", result);
+        assert!(
+            result.is_ok(),
+            "Should parse composition with mixed parameters: {:?}",
+            result
+        );
     }
 
     // Existing tests
@@ -81,11 +89,11 @@ Logistics <Protocol>("Multi-party logistics protocol") {
 
         let result = parse_source(source);
         assert!(result.is_ok(), "Failed to parse: {:?}", result);
-        
+
         let ast = result.unwrap();
         assert_eq!(ast.node_type, AstNodeType::Program);
         assert_eq!(ast.children.len(), 1);
-        
+
         let protocol = &ast.children[0];
         assert_eq!(protocol.node_type, AstNodeType::Protocol);
     }
@@ -107,15 +115,15 @@ Test <Protocol>("Test protocol with composition") {
 
         let result = parse_source(source);
         assert!(result.is_ok(), "Failed to parse: {:?}", result);
-        
+
         let ast = result.unwrap();
         let protocol = &ast.children[0];
-        
+
         // PEG structure: Protocol -> [ProtocolName, Annotation, RolesSection, ParametersSection, InteractionSection]
         let interaction_section = &protocol.children[4]; // InteractionSection is at index 4
         let interaction_item = &interaction_section.children[0];
         let composition = &interaction_item.children[0];
-        
+
         assert_eq!(composition.node_type, AstNodeType::ProtocolComposition);
     }
 
@@ -160,8 +168,12 @@ Pack <Protocol>("Package preparation protocol") {
         "#;
 
         let result = parse_source(source);
-        assert!(result.is_ok(), "Failed to parse complete protocol: {:?}", result);
-        
+        assert!(
+            result.is_ok(),
+            "Failed to parse complete protocol: {:?}",
+            result
+        );
+
         let ast = result.unwrap();
         assert_eq!(ast.node_type, AstNodeType::Program);
         assert_eq!(ast.children.len(), 2); // Two protocols
@@ -183,7 +195,10 @@ Logistics ("Multi-party logistics protocol") {
         "#;
 
         let result = parse_source(source);
-        assert!(result.is_err(), "Should fail when <Protocol> tag is missing");
+        assert!(
+            result.is_err(),
+            "Should fail when <Protocol> tag is missing"
+        );
     }
 
     #[test]
@@ -240,7 +255,10 @@ Logistics <Protocol>("Multi-party logistics protocol") {
         "#;
 
         let result = parse_source(source);
-        assert!(result.is_err(), "Should fail when <Enactment> tag is missing");
+        assert!(
+            result.is_err(),
+            "Should fail when <Enactment> tag is missing"
+        );
     }
 
     #[test]
@@ -258,7 +276,10 @@ Logistics <Protocol>("Multi-party logistics protocol") {
         "#;
 
         let result = parse_source(source);
-        assert!(result.is_err(), "Should fail when parameter type tag is missing");
+        assert!(
+            result.is_err(),
+            "Should fail when parameter type tag is missing"
+        );
     }
 
     // Error tests - Missing annotations
@@ -277,7 +298,10 @@ Logistics <Protocol> {
         "#;
 
         let result = parse_source(source);
-        assert!(result.is_err(), "Should fail when protocol annotation is missing");
+        assert!(
+            result.is_err(),
+            "Should fail when protocol annotation is missing"
+        );
     }
 
     #[test]
@@ -295,7 +319,10 @@ Logistics <Protocol>("Multi-party logistics protocol") {
         "#;
 
         let result = parse_source(source);
-        assert!(result.is_err(), "Should fail when role annotation is missing");
+        assert!(
+            result.is_err(),
+            "Should fail when role annotation is missing"
+        );
     }
 
     #[test]
@@ -313,7 +340,10 @@ Logistics <Protocol>("Multi-party logistics protocol") {
         "#;
 
         let result = parse_source(source);
-        assert!(result.is_err(), "Should fail when parameter annotation is missing");
+        assert!(
+            result.is_err(),
+            "Should fail when parameter annotation is missing"
+        );
     }
 
     #[test]
@@ -332,7 +362,10 @@ Logistics <Protocol>("Multi-party logistics protocol") {
         "#;
 
         let result = parse_source(source);
-        assert!(result.is_err(), "Should fail when action annotation is missing");
+        assert!(
+            result.is_err(),
+            "Should fail when action annotation is missing"
+        );
     }
 
     // Updated test for square bracket syntax
@@ -356,14 +389,18 @@ Logistics <Protocol>("Multi-party logistics protocol with commas, semicolons; an
 
         let result = parse_source(source);
         assert!(result.is_ok(), "Should correctly parse annotations with commas separate from composition parameters: {:?}", result);
-        
+
         let ast = result.unwrap();
-        
+
         // Count all annotations in the entire protocol
         let mut annotation_count = 0;
         let mut composition_count = 0;
-        
-        fn count_annotations_and_compositions(node: &AstNode, ann_count: &mut usize, comp_count: &mut usize) {
+
+        fn count_annotations_and_compositions(
+            node: &AstNode,
+            ann_count: &mut usize,
+            comp_count: &mut usize,
+        ) {
             match node.node_type {
                 AstNodeType::Annotation => {
                     *ann_count += 1;
@@ -373,29 +410,35 @@ Logistics <Protocol>("Multi-party logistics protocol with commas, semicolons; an
                 }
                 _ => {}
             }
-            
+
             // Recursively count in all children
             for child in &node.children {
                 count_annotations_and_compositions(child, ann_count, comp_count);
             }
         }
-        
+
         count_annotations_and_compositions(&ast, &mut annotation_count, &mut composition_count);
-        
+
         // Assert exactly 7 annotations:
         // 1. Protocol annotation: "Multi-party logistics protocol with commas, semicolons; and other punctuation."
         // 2. Role M annotation: "Merchant, coordinator, and manager"
-        // 3. Role W annotation: "Warehouse, storage, and inventory" 
+        // 3. Role W annotation: "Warehouse, storage, and inventory"
         // 4. Parameter ID annotation: "unique identifier, used for tracking, contains special chars"
         // 5. Parameter order annotation: "order details, specifications, and requirements"
         // 6. Parameter package annotation: "packaged item ready for shipping"
         // 7. Action NotifyOrder annotation: "merchant notifies warehouse of new order, including details, timing, and priority"
-        assert_eq!(annotation_count, 7, "Should have exactly 7 annotations in the protocol");
-        
+        assert_eq!(
+            annotation_count, 7,
+            "Should have exactly 7 annotations in the protocol"
+        );
+
         // Assert exactly 1 protocol composition:
         // Pack <Enactment>[W, M, in ID, in order, out package]
-        assert_eq!(composition_count, 1, "Should have exactly 1 protocol composition");
-        
+        assert_eq!(
+            composition_count, 1,
+            "Should have exactly 1 protocol composition"
+        );
+
         // Verify that all commas in annotations are preserved and don't interfere with parsing
         verify_annotation_content(&ast);
         verify_composition_structure(&ast);
@@ -403,7 +446,7 @@ Logistics <Protocol>("Multi-party logistics protocol with commas, semicolons; an
 
     fn verify_annotation_content(ast: &AstNode) {
         let mut protocol_annotation_found = false;
-        
+
         fn search_annotations(node: &AstNode, found: &mut bool) {
             if node.node_type == AstNodeType::Annotation {
                 if let Some(description) = node.get_string("description") {
@@ -411,32 +454,38 @@ Logistics <Protocol>("Multi-party logistics protocol with commas, semicolons; an
                         *found = true;
                         assert!(description.contains(","), "Should contain commas");
                         assert!(description.contains(";"), "Should contain semicolons");
-                        assert!(description.contains("punctuation"), "Should contain full text");
+                        assert!(
+                            description.contains("punctuation"),
+                            "Should contain full text"
+                        );
                     }
                 }
             }
-            
+
             for child in &node.children {
                 search_annotations(child, found);
             }
         }
-        
+
         search_annotations(ast, &mut protocol_annotation_found);
-        assert!(protocol_annotation_found, "Should find protocol annotation with commas");
+        assert!(
+            protocol_annotation_found,
+            "Should find protocol annotation with commas"
+        );
     }
 
     fn verify_composition_structure(ast: &AstNode) {
         let mut composition_found = false;
-        
+
         fn search_composition(node: &AstNode, found: &mut bool) {
             if node.node_type == AstNodeType::ProtocolComposition {
                 *found = true;
-                
+
                 // Verify the composition has the expected structure with square brackets
                 let mut protocol_ref_found = false;
                 let mut role_params = 0;
                 let mut parameter_flows = 0;
-                
+
                 for child in &node.children {
                     match child.node_type {
                         AstNodeType::ProtocolReference => protocol_ref_found = true,
@@ -445,19 +494,31 @@ Logistics <Protocol>("Multi-party logistics protocol with commas, semicolons; an
                         _ => {}
                     }
                 }
-                
-                assert!(protocol_ref_found, "Composition should have protocol reference");
-                assert_eq!(role_params, 2, "Composition should have 2 role parameters (W, M)");
-                assert_eq!(parameter_flows, 3, "Composition should have 3 parameter flows (in ID, in order, out package)");
+
+                assert!(
+                    protocol_ref_found,
+                    "Composition should have protocol reference"
+                );
+                assert_eq!(
+                    role_params, 2,
+                    "Composition should have 2 role parameters (W, M)"
+                );
+                assert_eq!(
+                    parameter_flows, 3,
+                    "Composition should have 3 parameter flows (in ID, in order, out package)"
+                );
             }
-            
+
             for child in &node.children {
                 search_composition(child, found);
             }
         }
-        
+
         search_composition(ast, &mut composition_found);
-        assert!(composition_found, "Should find the protocol composition with square brackets");
+        assert!(
+            composition_found,
+            "Should find the protocol composition with square brackets"
+        );
     }
 
     #[test]
@@ -475,7 +536,10 @@ Logistics <Protocol>("Multi-party logistics protocol) {
         "#;
 
         let result = parse_source(source);
-        assert!(result.is_err(), "Should fail when annotation quotes are malformed");
+        assert!(
+            result.is_err(),
+            "Should fail when annotation quotes are malformed"
+        );
     }
 
     #[test]
@@ -495,7 +559,10 @@ Logistics <Protocol>("Multi-party logistics protocol") {
         "#;
 
         let result = parse_source(source);
-        assert!(result.is_err(), "Should fail when composition parameters are not enclosed in square brackets");
+        assert!(
+            result.is_err(),
+            "Should fail when composition parameters are not enclosed in square brackets"
+        );
     }
 
     #[test]
@@ -514,8 +581,11 @@ Logistics <Protocol>("Protocol with nested quotes in description") {
 
         let result = parse_source(source);
         // PEG parser should handle this better than pest
-        assert!(result.is_ok(), "PEG parser should handle nested quotes correctly");
-        
+        assert!(
+            result.is_ok(),
+            "PEG parser should handle nested quotes correctly"
+        );
+
         if result.is_ok() {
             println!("✅ PEG parser handles nested quotes correctly");
         } else {
@@ -552,7 +622,10 @@ Logistics <Protocol>("Multi-party logistics protocol") {
         "#;
 
         let result = parse_source(source);
-        assert!(result.is_err(), "Should fail when parameters section is missing");
+        assert!(
+            result.is_err(),
+            "Should fail when parameters section is missing"
+        );
     }
 
     #[test]
@@ -582,7 +655,10 @@ Logistics <Protocol>("Multi-party logistics protocol") {
         "#;
 
         let result = parse_source(source);
-        assert!(result.is_err(), "Should fail when interaction arrow is malformed");
+        assert!(
+            result.is_err(),
+            "Should fail when interaction arrow is malformed"
+        );
     }
 
     #[test]
@@ -601,7 +677,10 @@ Logistics <Protocol>("Multi-party logistics protocol") {
         "#;
 
         let result = parse_source(source);
-        assert!(result.is_err(), "Should fail when parameter direction is invalid");
+        assert!(
+            result.is_err(),
+            "Should fail when parameter direction is invalid"
+        );
     }
 
     #[test]
@@ -624,15 +703,18 @@ Logistics <Protocol>("Multi-party logistics protocol") {
         "#;
 
         let result = parse_source(source);
-        assert!(result.is_ok(), "Should correctly parse mixed role identifiers and parameter flows in composition");
-        
+        assert!(
+            result.is_ok(),
+            "Should correctly parse mixed role identifiers and parameter flows in composition"
+        );
+
         if result.is_ok() {
             let ast = result.unwrap();
             let protocol = &ast.children[0];
             let interaction_section = &protocol.children[4]; // InteractionSection at index 4
             let interaction_item = &interaction_section.children[0];
             let composition = &interaction_item.children[0];
-            
+
             assert_eq!(composition.node_type, AstNodeType::ProtocolComposition);
             // Should have protocol reference + multiple composition parameters
             assert!(composition.children.len() > 1);
@@ -665,7 +747,10 @@ InvalidProtocol ("Missing protocol tag") {
         "#;
 
         let result = parse_source(source);
-        assert!(result.is_err(), "Should fail when any protocol in the program is invalid");
+        assert!(
+            result.is_err(),
+            "Should fail when any protocol in the program is invalid"
+        );
     }
 
     #[test]
@@ -685,7 +770,10 @@ Logistics <Protocol>("Multi-party logistics protocol") {
         "#;
 
         let result = parse_source(source);
-        assert!(result.is_ok(), "Should handle empty parameter flow lists correctly");
+        assert!(
+            result.is_ok(),
+            "Should handle empty parameter flow lists correctly"
+        );
     }
 
     #[test]
@@ -700,7 +788,10 @@ Pack<Enactment>[W,M,in ID,out result]
         "#;
 
         let result = parse_source(source);
-        assert!(result.is_ok(), "Should handle compact formatting without extra whitespace");
+        assert!(
+            result.is_ok(),
+            "Should handle compact formatting without extra whitespace"
+        );
     }
 
     // Additional PEG-specific tests
@@ -719,8 +810,11 @@ Logistics <Protocol>("Test protocol") {
         "#;
 
         let result = parse_source(source);
-        assert!(result.is_err(), "Should provide clear error for incomplete interaction");
-        
+        assert!(
+            result.is_err(),
+            "Should provide clear error for incomplete interaction"
+        );
+
         // PEG should provide better error messages
         if let Err(e) = result {
             println!("PEG error message: {}", e);
@@ -749,7 +843,10 @@ ComplexProtocol <Protocol>("Protocol with complex composition") {
         "#;
 
         let result = parse_source(source);
-        assert!(result.is_ok(), "Should handle complex composition with many parameters: {:?}", result);
+        assert!(
+            result.is_ok(),
+            "Should handle complex composition with many parameters: {:?}",
+            result
+        );
     }
 }
-

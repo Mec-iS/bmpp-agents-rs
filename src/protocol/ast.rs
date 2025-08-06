@@ -57,10 +57,10 @@ impl AstNode {
 impl AstNode {
     fn format_node_name(&self) -> String {
         let node_type_str = format!("{:?}", self.node_type);
-        
+
         // Get the primary property value for display
         let property_value = self.get_primary_property_value();
-        
+
         if let Some(value) = property_value {
             format!("{} (\"{}\")", node_type_str, value)
         } else {
@@ -78,8 +78,10 @@ impl AstNode {
             AstNodeType::BasicType => self.get_string("type"),
             AstNodeType::ParameterFlow => {
                 // For parameter flows, show direction and parameter name
-                if let (Some(direction), Some(param_name)) = 
-                    (self.get_string("direction"), self.children.first()?.get_string("name")) {
+                if let (Some(direction), Some(param_name)) = (
+                    self.get_string("direction"),
+                    self.children.first()?.get_string("name"),
+                ) {
                     // Create a temporary string - we'll need to handle this differently
                     // For now, just show the direction
                     Some(direction)
@@ -117,7 +119,7 @@ impl AstNode {
 impl AstNode {
     fn format_node_name_enhanced(&self) -> String {
         let node_type_str = format!("{:?}", self.node_type);
-        
+
         match self.node_type {
             AstNodeType::ParameterFlow => {
                 if let Some(formatted) = self.format_parameter_flow() {
@@ -163,7 +165,13 @@ impl AstNode {
             write!(f, "{}", self.format_node_name_enhanced())?;
         } else {
             let connector = if is_last { "└── " } else { "├── " };
-            writeln!(f, "{}{}{}", prefix, connector, self.format_node_name_enhanced())?;
+            writeln!(
+                f,
+                "{}{}{}",
+                prefix,
+                connector,
+                self.format_node_name_enhanced()
+            )?;
         }
 
         // Calculate prefix for children
@@ -178,11 +186,11 @@ impl AstNode {
         let child_count = self.children.len();
         for (index, child) in self.children.iter().enumerate() {
             let is_last_child = index == child_count - 1;
-            
+
             if is_root && index == 0 {
                 writeln!(f)?; // Add newline after root node
             }
-            
+
             child.display_tree(f, &child_prefix, is_last_child, false)?;
         }
 
@@ -203,10 +211,13 @@ pub fn _print_ast_debug(node: &AstNode, max_depth: usize) {
         if depth > max_depth {
             return;
         }
-        
+
         let indent = "  ".repeat(depth);
-        println!("{}AstNode {{ node_type: {:?}, children: [", indent, node.node_type);
-        
+        println!(
+            "{}AstNode {{ node_type: {:?}, children: [",
+            indent, node.node_type
+        );
+
         if !node.properties.is_empty() {
             println!("{}  properties: {{", indent);
             for (key, value) in &node.properties {
@@ -214,17 +225,17 @@ pub fn _print_ast_debug(node: &AstNode, max_depth: usize) {
             }
             println!("{}  }}", indent);
         }
-        
+
         for child in &node.children {
             print_recursive(child, depth + 1, max_depth);
         }
-        
+
         println!("{}]", indent);
         if depth == 0 {
             println!("}}");
         }
     }
-    
+
     print_recursive(node, 0, max_depth);
 }
 
@@ -234,29 +245,29 @@ impl AstNode {
     pub fn print_tree(&self) {
         println!("{}", self);
     }
-    
+
     /// Get a formatted string representation of the tree
     pub fn to_tree_string(&self) -> String {
         format!("{}", self)
     }
-    
+
     /// Find all nodes of a specific type
     pub fn find_nodes(&self, node_type: AstNodeType) -> Vec<AstNode> {
         let mut result = Vec::new();
         self.collect_nodes_of_type(node_type, &mut result);
         result
     }
-    
+
     fn collect_nodes_of_type(&self, target_type: AstNodeType, result: &mut Vec<AstNode>) {
         if self.node_type == target_type {
             result.push(self.clone());
         }
-        
+
         for child in &self.children {
             child.collect_nodes_of_type(target_type.clone(), result);
         }
     }
-    
+
     /// Count nodes of a specific type
     pub fn count_nodes(&self, node_type: AstNodeType) -> usize {
         self.find_nodes(node_type).len()
@@ -268,21 +279,24 @@ impl AstNode {
 
     /// Find the first child node of a specific type
     pub fn find_child(&self, node_type: AstNodeType) -> Option<&AstNode> {
-        self.children.iter()
+        self.children
+            .iter()
             .find(|child| child.node_type == node_type)
             .map(|boxed_child| boxed_child.as_ref())
     }
 
     /// Find the first mutable child node of a specific type
     pub fn find_child_mut(&mut self, node_type: AstNodeType) -> Option<&mut AstNode> {
-        self.children.iter_mut()
+        self.children
+            .iter_mut()
             .find(|child| child.node_type == node_type)
             .map(|boxed_child| boxed_child.as_mut())
     }
 
     /// Find all child nodes of a specific type
     pub fn find_children(&self, node_type: AstNodeType) -> Vec<&AstNode> {
-        self.children.iter()
+        self.children
+            .iter()
             .filter(|child| child.node_type == node_type)
             .map(|boxed_child| boxed_child.as_ref())
             .collect()
@@ -378,7 +392,7 @@ impl AstNode {
             AstNodeType::StandardInteraction | AstNodeType::ProtocolComposition => {
                 self.find_children(AstNodeType::ParameterFlow)
             }
-            _ => Vec::new()
+            _ => Vec::new(),
         }
     }
 
@@ -412,16 +426,14 @@ impl AstNode {
             AstNodeType::Identifier | AstNodeType::RoleRef | AstNodeType::ActionName => {
                 self.get_string("name").cloned()
             }
-            AstNodeType::ProtocolName => {
-                self.get_string("name").cloned()
-            }
+            AstNodeType::ProtocolName => self.get_string("name").cloned(),
             AstNodeType::ProtocolReference => {
                 // For ProtocolReference, get name from child Identifier
                 self.find_child(AstNodeType::Identifier)?
                     .get_string("name")
                     .cloned()
             }
-            _ => None
+            _ => None,
         }
     }
 
@@ -430,12 +442,13 @@ impl AstNode {
         if self.node_type != AstNodeType::ParameterFlow {
             return None;
         }
-        
+
         let direction = self.get_string("direction")?.clone();
-        let param_name = self.find_child(AstNodeType::Identifier)?
+        let param_name = self
+            .find_child(AstNodeType::Identifier)?
             .get_string("name")?
             .clone();
-        
+
         Some((direction, param_name))
     }
 
@@ -444,14 +457,16 @@ impl AstNode {
         if self.node_type != AstNodeType::RoleDecl {
             return None;
         }
-        
-        let name = self.find_child(AstNodeType::Identifier)?
+
+        let name = self
+            .find_child(AstNodeType::Identifier)?
             .get_string("name")?
             .clone();
-        let description = self.find_child(AstNodeType::Annotation)?
+        let description = self
+            .find_child(AstNodeType::Annotation)?
             .get_string("description")?
             .clone();
-        
+
         Some((name, description))
     }
 
@@ -460,17 +475,20 @@ impl AstNode {
         if self.node_type != AstNodeType::ParameterDecl {
             return None;
         }
-        
-        let name = self.find_child(AstNodeType::Identifier)?
+
+        let name = self
+            .find_child(AstNodeType::Identifier)?
             .get_string("name")?
             .clone();
-        let param_type = self.find_child(AstNodeType::BasicType)?
+        let param_type = self
+            .find_child(AstNodeType::BasicType)?
             .get_string("type")?
             .clone();
-        let description = self.find_child(AstNodeType::Annotation)?
+        let description = self
+            .find_child(AstNodeType::Annotation)?
             .get_string("description")?
             .clone();
-        
+
         Some((name, param_type, description))
     }
 
@@ -479,21 +497,23 @@ impl AstNode {
         if self.node_type != AstNodeType::StandardInteraction {
             return None;
         }
-        
+
         let role_refs = self.get_role_refs();
         let from_role = role_refs.get(0)?.get_identifier_name()?;
         let to_role = role_refs.get(1)?.get_identifier_name()?;
-        
+
         let action_name = self.get_action_name()?.get_identifier_name()?;
-        let description = self.find_child(AstNodeType::Annotation)?
+        let description = self
+            .find_child(AstNodeType::Annotation)?
             .get_string("description")?
             .clone();
-        
-        let parameter_flows = self.get_parameter_flows()
+
+        let parameter_flows = self
+            .get_parameter_flows()
             .iter()
             .filter_map(|pf| pf.get_parameter_flow_info())
             .collect();
-        
+
         Some(StandardInteractionInfo {
             from_role,
             to_role,
@@ -514,7 +534,6 @@ pub struct StandardInteractionInfo {
     pub parameter_flows: Vec<(String, String)>, // (direction, parameter_name)
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -523,7 +542,7 @@ mod tests {
     fn test_ast_node_creation() {
         let mut node = AstNode::new(AstNodeType::Protocol);
         node.set_string("name", "TestProtocol");
-        
+
         assert_eq!(node.node_type, AstNodeType::Protocol);
         assert_eq!(node.get_string("name"), Some(&"TestProtocol".to_string()));
     }
@@ -532,22 +551,22 @@ mod tests {
     fn test_tree_display() {
         // Create a simple AST for testing
         let mut program = AstNode::new(AstNodeType::Program);
-        
+
         let mut protocol = AstNode::new(AstNodeType::Protocol);
-        
+
         let mut protocol_name = AstNode::new(AstNodeType::ProtocolName);
         protocol_name.set_string("name", "TestProtocol");
-        
+
         let mut annotation = AstNode::new(AstNodeType::Annotation);
         annotation.set_string("description", "A test protocol");
-        
+
         protocol.children.push(Box::new(protocol_name));
         protocol.children.push(Box::new(annotation));
-        
+
         program.children.push(Box::new(protocol));
-        
+
         let tree_string = program.to_tree_string();
-        
+
         // Test that the output contains expected elements
         assert!(tree_string.contains("Program"));
         assert!(tree_string.contains("Protocol"));
@@ -560,21 +579,21 @@ mod tests {
     #[test]
     fn test_node_finding() {
         let mut program = AstNode::new(AstNodeType::Program);
-        
+
         let mut protocol = AstNode::new(AstNodeType::Protocol);
         let annotation1 = AstNode::new(AstNodeType::Annotation);
         let annotation2 = AstNode::new(AstNodeType::Annotation);
-        
+
         protocol.children.push(Box::new(annotation1));
         protocol.children.push(Box::new(annotation2));
         program.children.push(Box::new(protocol));
-        
+
         let annotations = program.find_nodes(AstNodeType::Annotation);
         assert_eq!(annotations.len(), 2);
-        
+
         let protocols = program.find_nodes(AstNodeType::Protocol);
         assert_eq!(protocols.len(), 1);
-        
+
         assert_eq!(program.count_nodes(AstNodeType::Annotation), 2);
     }
 }

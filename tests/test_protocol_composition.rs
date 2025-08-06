@@ -1,5 +1,5 @@
 use anyhow::Result;
-use bmpp_agents::transpiler::{parser::parse_source, codegen::BmppCodeGenerator};
+use bmpp_agents::transpiler::{codegen::BmppCodeGenerator, parser::parse_source};
 
 #[test]
 fn test_protocol_composition_basic() -> Result<()> {
@@ -40,19 +40,18 @@ Logistics <Protocol>("Logistics protocol using Pack") {
 }
 
     "#;
-    
+
     let ast = parse_source(bmpp_source)?;
     let code_generator = BmppCodeGenerator::new();
     let generated_code = code_generator.generate(&ast)?;
-    
+
     // Verify that the generated code contains both protocols
     assert!(generated_code.contains("pub struct PackProtocol"));
     assert!(generated_code.contains("pub struct LogisticsProtocol"));
     assert!(generated_code.contains("pub fn pack"));
-    
+
     Ok(())
 }
-
 
 #[test]
 fn test_nested_protocol_composition() -> Result<()> {
@@ -108,17 +107,17 @@ fn test_nested_protocol_composition() -> Result<()> {
             W -> M: Deliver <Action>("deliver")[in ID, in route, out delivery]
         }
     "#;
-    
+
     let ast = parse_source(bmpp_source)?;
 
     println!("test_nested_protocol_composition AST \n{}", &ast);
     let code_generator = BmppCodeGenerator::new();
     let generated_code = code_generator.generate(&ast)?;
-    
+
     // Verify all protocols are generated with proper composition
     assert!(generated_code.contains("pub struct LoadProtocol"));
-    assert!(generated_code.contains("pub struct PackProtocol"));  
+    assert!(generated_code.contains("pub struct PackProtocol"));
     assert!(generated_code.contains("pub struct LogisticsWithNestedCompositionProtocol"));
-    
+
     Ok(())
 }

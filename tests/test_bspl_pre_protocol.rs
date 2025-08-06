@@ -22,10 +22,12 @@ ProtocolKnowledge <Protocol>("test pre-protocol knowledge principle") {
 
     let ast = parse_source(protocol)?;
     let result = validate_parameter_flow(&ast);
-    
-    assert!(result.is_ok(), 
-           "Customer should be able to emit pre-protocol knowledge (customer_id, service_request)");
-    
+
+    assert!(
+        result.is_ok(),
+        "Customer should be able to emit pre-protocol knowledge (customer_id, service_request)"
+    );
+
     Ok(())
 }
 
@@ -49,10 +51,18 @@ MultipleProducers <Protocol>("test multiple producers violation") {
 
     let ast = parse_source(protocol).unwrap();
     let result = validate_parameter_flow(&ast);
-    
-    assert!(result.is_err(), "Multiple producers should be detected as a safety violation");
-    assert!(result.unwrap_err().to_string().contains("multiple interactions"),
-           "Error should specifically mention multiple producers");
+
+    assert!(
+        result.is_err(),
+        "Multiple producers should be detected as a safety violation"
+    );
+    assert!(
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("multiple interactions"),
+        "Error should specifically mention multiple producers"
+    );
 }
 
 #[test]
@@ -75,13 +85,18 @@ CyclicDependency <Protocol>("test cyclic dependency detection") {
 
     let ast = parse_source(protocol).unwrap();
     let result = validate_parameter_flow(&ast);
-    
+
     assert!(result.is_err(), "Circular dependency should be detected");
-    assert!(result.unwrap_err().to_string().contains("Circular dependency"),
-           "Error should specifically mention circular dependency");
+    assert!(
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("Circular dependency"),
+        "Error should specifically mention circular dependency"
+    );
 }
 
-#[test]  
+#[test]
 fn test_bspl_principle_4_complete_information_flow() {
     // BSPL Principle 4: All consumed parameters must have producers
     let protocol = r#"
@@ -99,10 +114,18 @@ IncompleteFlow <Protocol>("test incomplete information flow") {
 
     let ast = parse_source(protocol).unwrap();
     let result = validate_parameter_flow(&ast);
-    
-    assert!(result.is_err(), "Orphaned parameter consumption should be detected");
-    assert!(result.unwrap_err().to_string().contains("consumed but never produced"),
-           "Error should mention missing producer");
+
+    assert!(
+        result.is_err(),
+        "Orphaned parameter consumption should be detected"
+    );
+    assert!(
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("consumed but never produced"),
+        "Error should mention missing producer"
+    );
 }
 
 #[test]
@@ -134,9 +157,12 @@ ValidPurchase <Protocol>("BSPL-compliant purchase protocol") {
 
     let ast = parse_source(protocol)?;
     let result = validate_parameter_flow(&ast);
-    
-    assert!(result.is_ok(), "Valid purchase protocol should pass all BSPL validations");
-    
+
+    assert!(
+        result.is_ok(),
+        "Valid purchase protocol should pass all BSPL validations"
+    );
+
     Ok(())
 }
 
@@ -160,54 +186,64 @@ DirectionsTest <Protocol>("test parameter flow directions") {
 
     let result = parse_source(source);
     assert!(result.is_ok(), "Should parse successfully: {:?}", result);
-    
+
     let ast = result.unwrap();
     println!("DEBUG: AST {}", ast);
 
     // Get the protocol using accessor methods
     let protocol_node = &ast.children[0];
     assert_eq!(protocol_node.node_type, AstNodeType::Protocol);
-    
+
     // Get the interactions section safely
-    let interactions_section = protocol_node.get_interactions_section()
+    let interactions_section = protocol_node
+        .get_interactions_section()
         .expect("Protocol should have an interactions section");
     println!("DEBUG: interactions_section {}", interactions_section);
-    
+
     // Get the interaction items
     let interaction_items = interactions_section.get_interaction_items();
-    assert_eq!(interaction_items.len(), 1, "Should have exactly one interaction");
-    
+    assert_eq!(
+        interaction_items.len(),
+        1,
+        "Should have exactly one interaction"
+    );
+
     let interaction_item = interaction_items[0];
     println!("DEBUG: interaction_item {}", interaction_item);
-    
+
     // Get the standard interaction
-    let standard_interaction = interaction_item.get_standard_interaction()
+    let standard_interaction = interaction_item
+        .get_standard_interaction()
         .expect("Interaction item should contain a standard interaction");
     println!("DEBUG: standard_interaction {}", standard_interaction);
-    
+
     // Get interaction information using the helper method
-    let interaction_info = standard_interaction.get_standard_interaction_info()
+    let interaction_info = standard_interaction
+        .get_standard_interaction_info()
         .expect("Should be able to extract interaction info");
-    
+
     assert_eq!(interaction_info.from_role, "Producer");
     assert_eq!(interaction_info.to_role, "Consumer");
     assert_eq!(interaction_info.action_name, "transfer");
     assert_eq!(interaction_info.parameter_flows.len(), 2);
-    
+
     // Verify parameter flow directions
-    let out_flows: Vec<_> = interaction_info.parameter_flows.iter()
+    let out_flows: Vec<_> = interaction_info
+        .parameter_flows
+        .iter()
         .filter(|(direction, _)| direction == "out")
         .collect();
-    let in_flows: Vec<_> = interaction_info.parameter_flows.iter()
+    let in_flows: Vec<_> = interaction_info
+        .parameter_flows
+        .iter()
         .filter(|(direction, _)| direction == "in")
         .collect();
-    
+
     assert_eq!(out_flows.len(), 1, "Should have exactly one out parameter");
     assert_eq!(in_flows.len(), 1, "Should have exactly one in parameter");
-    
+
     assert_eq!(out_flows[0].1, "produced_param");
     assert_eq!(in_flows[0].1, "consumed_param");
-    
+
     println!("✅ Parameter flow directions are correctly enforced");
 }
-

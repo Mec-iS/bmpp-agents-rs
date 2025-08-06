@@ -1,7 +1,7 @@
 use anyhow::Result;
-use tempfile::tempdir;
-use bmpp_agents::transpiler::{parser::parse_source, codegen::BmppCodeGenerator};
+use bmpp_agents::transpiler::{codegen::BmppCodeGenerator, parser::parse_source};
 use std::fs;
+use tempfile::tempdir;
 
 #[test]
 fn test_end_to_end_bmpp_compilation() -> Result<()> {
@@ -22,7 +22,7 @@ SimpleExchange <Protocol>("a basic data exchange protocol for testing") {
     Server -> Client: send_response <Action>("provide the requested information")[in request_id, in query, out response, out status]
 }
     "#;
-    
+
     let temp_dir = tempdir()?;
     let output_path = temp_dir.path();
 
@@ -34,13 +34,14 @@ SimpleExchange <Protocol>("a basic data exchange protocol for testing") {
     // 3. Create project structure (simulating what ProjectBuilder would do)
     let src_dir = output_path.join("src");
     fs::create_dir_all(&src_dir)?;
-    
+
     // Write main library file
     let lib_rs_path = src_dir.join("lib.rs");
     fs::write(&lib_rs_path, &generated_code)?;
-    
+
     // Write main binary file (for executable projects)
-    let main_rs_content = format!(r#"
+    let main_rs_content = format!(
+        r#"
 // Generated main file for SimpleExchange protocol
 use anyhow::Result;
 
@@ -60,11 +61,12 @@ fn main() -> Result<()> {{
     
     Ok(())
 }}
-"#);
-    
+"#
+    );
+
     let main_rs_path = src_dir.join("main.rs");
     fs::write(&main_rs_path, &main_rs_content)?;
-    
+
     // Generate Cargo.toml
     let cargo_toml_content = r#"
 [package]
@@ -81,7 +83,7 @@ anyhow = "1.0"
 name = "simple_exchange"
 path = "src/main.rs"
 "#;
-    
+
     let cargo_toml_path = output_path.join("Cargo.toml");
     fs::write(&cargo_toml_path, cargo_toml_content)?;
 
@@ -92,23 +94,23 @@ path = "src/main.rs"
 
     // 5. Verify generated library code content
     let lib_content = fs::read_to_string(&lib_rs_path)?;
-    
+
     // Check for BMPP-specific generated content
     assert!(
         lib_content.contains("pub struct SimpleExchangeProtocol"),
         "SimpleExchangeProtocol struct not found in generated library code"
     );
-    
+
     assert!(
         lib_content.contains("pub struct Agent"),
         "Agent struct not found in generated library code"
     );
-    
+
     assert!(
         lib_content.contains("pub fn send_request"),
         "send_request method not found in generated library code"
     );
-    
+
     assert!(
         lib_content.contains("pub fn send_response"),
         "send_response method not found in generated library code"
@@ -116,17 +118,17 @@ path = "src/main.rs"
 
     // 6. Verify main binary code content
     let main_content = fs::read_to_string(&main_rs_path)?;
-    
+
     assert!(
         main_content.contains("use lib::SimpleExchangeProtocol"),
         "Protocol import not found in generated main code"
     );
-    
+
     assert!(
         main_content.contains("protocol.send_request()"),
         "send_request call not found in generated main code"
     );
-    
+
     assert!(
         main_content.contains("protocol.send_response()"),
         "send_response call not found in generated main code"
@@ -137,28 +139,28 @@ path = "src/main.rs"
         lib_content.contains("client: Agent"),
         "client field not found in protocol struct"
     );
-    
+
     assert!(
         lib_content.contains("server: Agent"),
         "server field not found in protocol struct"
     );
-    
+
     // 8. Verify parameters are included
     assert!(
         lib_content.contains("request_id: String"),
         "request_id parameter not found in generated library code"
     );
-    
+
     assert!(
         lib_content.contains("query: String"),
         "query parameter not found in generated library code"
     );
-    
+
     assert!(
         lib_content.contains("response: String"),
         "response parameter not found in generated library code"
     );
-    
+
     assert!(
         lib_content.contains("status: bool"),
         "status parameter not found in generated library code"
@@ -169,7 +171,7 @@ path = "src/main.rs"
         lib_content.contains("use serde::{Serialize, Deserialize}"),
         "Serde imports not found in generated library code"
     );
-    
+
     assert!(
         lib_content.contains("#[derive(Debug, Clone, Serialize, Deserialize)]"),
         "Derive macros not found in generated library code"
@@ -181,7 +183,7 @@ path = "src/main.rs"
         cargo_content.contains("name = \"simple_exchange_protocol\""),
         "Package name not found in Cargo.toml"
     );
-    
+
     assert!(
         cargo_content.contains("anyhow = \"1.0\""),
         "anyhow dependency not found in Cargo.toml"
@@ -220,31 +222,30 @@ Negotiation <Protocol>("a complex negotiation protocol with multiple rounds") {
     Mediator -> Evaluator: mediate_discussion <Action>("facilitate resolution")[in mediation_id, out final_decision, out reason]
 }
     "#;
-    
+
     let ast = parse_source(complex_bmpp)?;
     let code_generator = BmppCodeGenerator::new();
     let generated_code = code_generator.generate(&ast)?;
-    
+
     // Verify complex protocol structure
     assert!(generated_code.contains("pub struct NegotiationProtocol"));
     assert!(generated_code.contains("proposer: Agent"));
     assert!(generated_code.contains("evaluator: Agent"));
     assert!(generated_code.contains("mediator: Agent"));
-    
+
     // Verify all interactions are generated
     assert!(generated_code.contains("pub fn submit_proposal"));
     assert!(generated_code.contains("pub fn evaluate_proposal"));
     assert!(generated_code.contains("pub fn request_mediation"));
     assert!(generated_code.contains("pub fn mediate_discussion"));
-    
+
     // Verify complex parameter types
     assert!(generated_code.contains("counter_offer: String"));
     assert!(generated_code.contains("final_decision: bool"));
     assert!(generated_code.contains("mediation_id: String"));
-    
+
     Ok(())
 }
-
 
 #[test]
 fn test_project_compilation_with_validation() -> Result<()> {
@@ -263,23 +264,23 @@ Ping <Protocol>("simple ping-pong protocol for validation testing") {
     Receiver -> Sender: pong <Action>("respond with pong message")[in message_id, in content]
 }
     "#;
-    
+
     let temp_dir = tempdir()?;
     let output_path = temp_dir.path();
-    
+
     // Generate the project
     let ast = parse_source(bmpp_source)?;
     let code_generator = BmppCodeGenerator::new();
     let generated_code = code_generator.generate(&ast)?;
-    
+
     // Create complete project structure
     let src_dir = output_path.join("src");
     fs::create_dir_all(&src_dir)?;
-    
+
     // Write library
     let lib_rs_path = src_dir.join("lib.rs");
     fs::write(&lib_rs_path, &generated_code)?;
-    
+
     // Write Cargo.toml with proper syntax checking dependencies
     let cargo_toml_content = r#"
 [package]
@@ -296,31 +297,37 @@ anyhow = "1.0"
 # Dependencies for testing generated code
 tokio = { version = "1.0", features = ["full"] }
 "#;
-    
+
     let cargo_toml_path = output_path.join("Cargo.toml");
     fs::write(&cargo_toml_path, cargo_toml_content)?;
-    
+
     // Verify the generated Rust code is syntactically valid
     let lib_content = fs::read_to_string(&lib_rs_path)?;
-    
+
     // Basic syntax validation checks
     assert!(lib_content.contains("impl PingProtocol"));
     assert!(lib_content.contains("pub fn new()"));
     assert!(lib_content.contains("pub fn ping"));
     assert!(lib_content.contains("pub fn pong"));
     assert!(lib_content.contains("-> Result<()>"));
-    
+
     // Check that all braces are balanced
     let open_braces = lib_content.matches('{').count();
     let close_braces = lib_content.matches('}').count();
-    assert_eq!(open_braces, close_braces, "Unbalanced braces in generated code");
-    
+    assert_eq!(
+        open_braces, close_braces,
+        "Unbalanced braces in generated code"
+    );
+
     // Check that all parentheses are balanced
     let open_parens = lib_content.matches('(').count();
     let close_parens = lib_content.matches(')').count();
-    assert_eq!(open_parens, close_parens, "Unbalanced parentheses in generated code");
-    
+    assert_eq!(
+        open_parens, close_parens,
+        "Unbalanced parentheses in generated code"
+    );
+
     println!("✅ Generated project structure validation passed!");
-    
+
     Ok(())
 }

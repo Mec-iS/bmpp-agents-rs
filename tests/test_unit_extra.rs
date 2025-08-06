@@ -1,7 +1,7 @@
 // tests/payload_tests.rs (or wherever these tests are located)
 use anyhow::Result;
-use bmpp_agents::transpiler::parser::parse_source;
 use bmpp_agents::protocol::ast::AstNodeType;
+use bmpp_agents::transpiler::parser::parse_source;
 
 #[test]
 fn test_greeting_generation_payload_with_inline_meaning() -> Result<()> {
@@ -19,18 +19,21 @@ GreetingProtocol <Protocol>("a protocol for generating friendly greetings") {
     Responder -> Requester: provide_greeting <Action>("provide the requested greeting")[in context, out greeting]
 }
     "#;
-    
+
     let ast = parse_source(bmpp_source)?;
-    
+
     // Verify the protocol was parsed correctly
     assert_eq!(ast.children.len(), 1);
     let protocol = &ast.children[0];
     assert_eq!(protocol.node_type, AstNodeType::Protocol);
-    
+
     // Use the convenience accessor methods
     assert_eq!(protocol.get_protocol_name().unwrap(), "GreetingProtocol");
-    assert_eq!(protocol.get_protocol_annotation().unwrap(), "a protocol for generating friendly greetings");
-    
+    assert_eq!(
+        protocol.get_protocol_annotation().unwrap(),
+        "a protocol for generating friendly greetings"
+    );
+
     Ok(())
 }
 
@@ -51,24 +54,29 @@ JokeProtocol <Protocol>("a protocol for generating humorous content") {
     Comedian -> Requester: deliver_joke <Action>("provide the requested joke")[in topic, in style, out joke]
 }
     "#;
-    
+
     let ast = parse_source(bmpp_source)?;
-    
+
     // Verify the protocol was parsed correctly
     assert_eq!(ast.children.len(), 1);
     let protocol = &ast.children[0];
     assert_eq!(protocol.node_type, AstNodeType::Protocol);
-    
+
     // Use the convenience accessor methods for protocol info
     assert_eq!(protocol.get_protocol_name().unwrap(), "JokeProtocol");
-    assert_eq!(protocol.get_protocol_annotation().unwrap(), "a protocol for generating humorous content");
-    
+    assert_eq!(
+        protocol.get_protocol_annotation().unwrap(),
+        "a protocol for generating humorous content"
+    );
+
     // Verify parameters section contains the joke parameter using accessor methods
-    let params_section = protocol.get_parameters_section()
+    let params_section = protocol
+        .get_parameters_section()
         .expect("Parameters section should exist");
-    
+
     let param_declarations = params_section.get_parameter_declarations();
-    let joke_param = param_declarations.iter()
+    let joke_param = param_declarations
+        .iter()
         .find(|param| {
             if let Some((name, _, _)) = param.get_parameter_decl_info() {
                 name == "joke"
@@ -77,12 +85,12 @@ JokeProtocol <Protocol>("a protocol for generating humorous content") {
             }
         })
         .expect("joke parameter should exist");
-    
+
     // Use the convenience method to get parameter declaration info
     let (name, param_type, description) = joke_param.get_parameter_decl_info().unwrap();
     assert_eq!(name, "joke");
     assert_eq!(param_type, "String");
     assert_eq!(description, "a short humorous line");
-    
+
     Ok(())
 }

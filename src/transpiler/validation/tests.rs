@@ -24,7 +24,11 @@ Purchase <Protocol>("test pre-protocol knowledge emission") {
 
         let ast = parse_source(bmpp_source)?;
         let result = validate_parameter_flow(&ast);
-        assert!(result.is_ok(), "Pre-protocol knowledge emission should be valid: {:?}", result);
+        assert!(
+            result.is_ok(),
+            "Pre-protocol knowledge emission should be valid: {:?}",
+            result
+        );
         Ok(())
     }
 
@@ -48,12 +52,18 @@ BadProtocol <Protocol>("protocol with circular dependency") {
         let ast = parse_source(bmpp_source).unwrap();
         let result = validate_parameter_flow(&ast);
         assert!(result.is_err(), "Circular dependency should be detected");
-        
+
         let error_msg = result.unwrap_err().to_string();
-        assert!(error_msg.contains("Circular dependency detected"),
-               "Error should mention circular dependency, got: {}", error_msg);
-        assert!(error_msg.contains("action1") || error_msg.contains("action2"),
-               "Error should contain actual action names, got: {}", error_msg);
+        assert!(
+            error_msg.contains("Circular dependency detected"),
+            "Error should mention circular dependency, got: {}",
+            error_msg
+        );
+        assert!(
+            error_msg.contains("action1") || error_msg.contains("action2"),
+            "Error should contain actual action names, got: {}",
+            error_msg
+        );
     }
 
     #[test]
@@ -76,10 +86,14 @@ MultiProducerProtocol <Protocol>("protocol with multiple producers") {
         let ast = parse_source(bmpp_source).unwrap();
         let result = validate_parameter_flow(&ast);
         assert!(result.is_err(), "Multiple producers should be detected");
-        
+
         let error_msg = result.unwrap_err().to_string();
-        assert!(error_msg.contains("multiple interactions") || error_msg.contains("BSPL safety violation"),
-               "Error should mention multiple producers or BSPL violation, got: {}", error_msg);
+        assert!(
+            error_msg.contains("multiple interactions")
+                || error_msg.contains("BSPL safety violation"),
+            "Error should mention multiple producers or BSPL violation, got: {}",
+            error_msg
+        );
     }
 
     #[test]
@@ -101,7 +115,11 @@ UnusedParamProtocol <Protocol>("protocol with unused parameters") {
 
         let ast = parse_source(bmpp_source)?;
         let result = validate_parameter_flow(&ast);
-        assert!(result.is_ok(), "Unused parameters should not fail validation: {:?}", result);
+        assert!(
+            result.is_ok(),
+            "Unused parameters should not fail validation: {:?}",
+            result
+        );
         Ok(())
     }
 
@@ -122,11 +140,18 @@ NoProducerProtocol <Protocol>("protocol with consumer but no producer") {
 
         let ast = parse_source(bmpp_source).unwrap();
         let result = validate_parameter_flow(&ast);
-        assert!(result.is_err(), "Consumer without producer should be detected");
-        
+        assert!(
+            result.is_err(),
+            "Consumer without producer should be detected"
+        );
+
         let error_msg = result.unwrap_err().to_string();
-        assert!(error_msg.contains("consumed but never produced") || error_msg.contains("BSPL completeness violation"),
-               "Error should mention missing producer or BSPL violation, got: {}", error_msg);
+        assert!(
+            error_msg.contains("consumed but never produced")
+                || error_msg.contains("BSPL completeness violation"),
+            "Error should mention missing producer or BSPL violation, got: {}",
+            error_msg
+        );
     }
 
     #[test]
@@ -146,7 +171,11 @@ IDProtocol <Protocol>("protocol with special ID parameter handling") {
 
         let ast = parse_source(bmpp_source)?;
         let result = validate_parameter_flow(&ast);
-        assert!(result.is_ok(), "ID parameter should be handled specially: {:?}", result);
+        assert!(
+            result.is_ok(),
+            "ID parameter should be handled specially: {:?}",
+            result
+        );
         Ok(())
     }
 
@@ -167,11 +196,17 @@ UndeclaredParamProtocol <Protocol>("protocol using undeclared parameter") {
 
         let ast = parse_source(bmpp_source).unwrap();
         let result = validate_parameter_flow(&ast);
-        assert!(result.is_err(), "Undeclared parameter usage should be detected");
-        
+        assert!(
+            result.is_err(),
+            "Undeclared parameter usage should be detected"
+        );
+
         let error_msg = result.unwrap_err().to_string();
-        assert!(error_msg.contains("is not declared"),
-               "Error should mention undeclared parameter, got: {}", error_msg);
+        assert!(
+            error_msg.contains("is not declared"),
+            "Error should mention undeclared parameter, got: {}",
+            error_msg
+        );
     }
 
     #[test]
@@ -201,7 +236,11 @@ ComplexValidProtocol <Protocol>("complex but valid protocol") {
 
         let ast = parse_source(bmpp_source)?;
         let result = validate_parameter_flow(&ast);
-        assert!(result.is_ok(), "Complex valid protocol should pass validation: {:?}", result);
+        assert!(
+            result.is_ok(),
+            "Complex valid protocol should pass validation: {:?}",
+            result
+        );
         Ok(())
     }
 
@@ -221,11 +260,17 @@ InvalidDirectionProtocol ("protocol with invalid direction") {
         "#;
 
         let result = parse_source(bmpp_source);
-        assert!(result.is_err(), "Invalid parameter direction should be caught by parser");
-        
+        assert!(
+            result.is_err(),
+            "Invalid parameter direction should be caught by parser"
+        );
+
         let error_msg = result.unwrap_err().to_string();
-        assert!(error_msg.contains("expected") || error_msg.contains("Direction"),
-               "Error should mention parsing issue or Direction, got: {}", error_msg);
+        assert!(
+            error_msg.contains("expected") || error_msg.contains("Direction"),
+            "Error should mention parsing issue or Direction, got: {}",
+            error_msg
+        );
     }
 
     #[test]
@@ -245,7 +290,11 @@ EmptyFlowProtocol <Protocol>("protocol with empty parameter flow") {
 
         let ast = parse_source(bmpp_source)?;
         let result = validate_parameter_flow(&ast);
-        assert!(result.is_ok(), "Empty parameter flow should be valid: {:?}", result);
+        assert!(
+            result.is_ok(),
+            "Empty parameter flow should be valid: {:?}",
+            result
+        );
         Ok(())
     }
 
@@ -271,14 +320,18 @@ CausalityChainProtocol <Protocol>("protocol with proper causality chain") {
 
         let ast = parse_source(bmpp_source)?;
         let result = validate_parameter_flow(&ast);
-        assert!(result.is_ok(), "Valid causality chain should pass validation: {:?}", result);
-        
+        assert!(
+            result.is_ok(),
+            "Valid causality chain should pass validation: {:?}",
+            result
+        );
+
         if let Ok(_) = result {
             println!("✅ Causality chain validation passed");
             println!("Execution order: step1 (A->B) → step2 (B->C) → step3 (C->A)");
             println!("Parameter flow: input → intermediate → output");
         }
-        
+
         Ok(())
     }
 
@@ -301,15 +354,24 @@ CausalityChainProtocol <Protocol>("protocol with proper causality chain") {
 
         let ast = parse_source(bmpp_source)?;
         let result = validate_parameter_flow(&ast);
-        assert!(result.is_err(), "Circular dependency should be detected as causality violation");
-        
+        assert!(
+            result.is_err(),
+            "Circular dependency should be detected as causality violation"
+        );
+
         if let Err(e) = result {
             println!("✅ Causality violation correctly detected: {}", e);
-            assert!(e.to_string().contains("causality") || e.to_string().contains("Circular dependency"));
-            assert!(e.to_string().contains("action1") || e.to_string().contains("action2"),
-                   "Error should contain actual action names, got: {}", e);
+            assert!(
+                e.to_string().contains("causality")
+                    || e.to_string().contains("Circular dependency")
+            );
+            assert!(
+                e.to_string().contains("action1") || e.to_string().contains("action2"),
+                "Error should contain actual action names, got: {}",
+                e
+            );
         }
-        
+
         Ok(())
     }
 
@@ -340,7 +402,11 @@ ParallelProtocol <Protocol>("protocol with parallel causality") {
 
         let ast = parse_source(bmpp_source)?;
         let result = validate_parameter_flow(&ast);
-        assert!(result.is_ok(), "Valid parallel causality should pass validation: {:?}", result);
+        assert!(
+            result.is_ok(),
+            "Valid parallel causality should pass validation: {:?}",
+            result
+        );
         Ok(())
     }
 
@@ -374,15 +440,23 @@ SubProtocol <Protocol>("sub protocol") {
         "#;
 
         let ast = parse_source(bmpp_source)?;
-        
+
         // The main protocol validation should fail because 'result' is never consumed
         let result = validate_parameter_flow(&ast);
-        assert!(result.is_err(), "Protocol with unused output parameter should fail validation: {:?}", result);
-        
+        assert!(
+            result.is_err(),
+            "Protocol with unused output parameter should fail validation: {:?}",
+            result
+        );
+
         // But composition validation should pass
         let comp_result = validate_protocol_composition(&ast);
-        assert!(comp_result.is_ok(), "Protocol composition validation should pass: {:?}", comp_result);
-        
+        assert!(
+            comp_result.is_ok(),
+            "Protocol composition validation should pass: {:?}",
+            comp_result
+        );
+
         Ok(())
     }
 
@@ -403,11 +477,17 @@ MainProtocol <Protocol>("protocol with invalid reference") {
 
         let ast = parse_source(bmpp_source).unwrap();
         let result = validate_protocol_composition(&ast);
-        assert!(result.is_err(), "Invalid protocol reference should be detected");
-        
+        assert!(
+            result.is_err(),
+            "Invalid protocol reference should be detected"
+        );
+
         let error_msg = result.unwrap_err().to_string();
-        assert!(error_msg.contains("unknown protocol"),
-               "Error should mention unknown protocol, got: {}", error_msg);
+        assert!(
+            error_msg.contains("unknown protocol"),
+            "Error should mention unknown protocol, got: {}",
+            error_msg
+        );
     }
 
     #[test]
@@ -428,11 +508,17 @@ RecursiveProtocol <Protocol>("self-referencing protocol") {
 
         let ast = parse_source(bmpp_source).unwrap();
         let result = validate_protocol_composition(&ast);
-        assert!(result.is_err(), "Self-referencing protocol should be detected");
-        
+        assert!(
+            result.is_err(),
+            "Self-referencing protocol should be detected"
+        );
+
         let error_msg = result.unwrap_err().to_string();
-        assert!(error_msg.contains("cannot reference itself"),
-               "Error should mention self-reference, got: {}", error_msg);
+        assert!(
+            error_msg.contains("cannot reference itself"),
+            "Error should mention self-reference, got: {}",
+            error_msg
+        );
     }
 
     #[test]
@@ -457,7 +543,11 @@ EnactableProtocol <Protocol>("protocol testing enactability") {
 
         let ast = parse_source(bmpp_source)?;
         let result = validate_parameter_flow(&ast);
-        assert!(result.is_ok(), "Enactable protocol should pass validation: {:?}", result);
+        assert!(
+            result.is_ok(),
+            "Enactable protocol should pass validation: {:?}",
+            result
+        );
         Ok(())
     }
 
@@ -482,14 +572,21 @@ UnreachableProtocol <Protocol>("protocol with potentially unreachable interactio
 
         let ast = parse_source(bmpp_source)?;
         let result = validate_parameter_flow(&ast);
-        
+
         // This should fail validation because 'orphan' is never produced and is not a pre-protocol parameter
-        assert!(result.is_err(), "Protocol with unreachable interaction should not be valid: {:?}", result);
-        
+        assert!(
+            result.is_err(),
+            "Protocol with unreachable interaction should not be valid: {:?}",
+            result
+        );
+
         let error_msg = result.unwrap_err().to_string();
-        assert!(error_msg.contains("consumed but never produced") || error_msg.contains("completeness"),
-               "Error should mention missing producer, got: {}", error_msg);
-        
+        assert!(
+            error_msg.contains("consumed but never produced") || error_msg.contains("completeness"),
+            "Error should mention missing producer, got: {}",
+            error_msg
+        );
+
         Ok(())
     }
 
@@ -512,14 +609,21 @@ IncompleteProtocol <Protocol>("protocol with completeness issues") {
 
         let ast = parse_source(bmpp_source)?;
         let result = validate_parameter_flow(&ast);
-        
+
         // Should fail validation because 'input' is consumed but never produced (and is not a pre-protocol parameter)
-        assert!(result.is_err(), "Incomplete protocol should not pass basic validation: {:?}", result);
-        
+        assert!(
+            result.is_err(),
+            "Incomplete protocol should not pass basic validation: {:?}",
+            result
+        );
+
         let error_msg = result.unwrap_err().to_string();
-        assert!(error_msg.contains("consumed but never produced") || error_msg.contains("completeness"),
-               "Error should mention completeness violation, got: {}", error_msg);
-        
+        assert!(
+            error_msg.contains("consumed but never produced") || error_msg.contains("completeness"),
+            "Error should mention completeness violation, got: {}",
+            error_msg
+        );
+
         Ok(())
     }
 
@@ -550,7 +654,11 @@ ComplexCausalityProtocol <Protocol>("protocol with complex causality") {
 
         let ast = parse_source(bmpp_source)?;
         let result = validate_parameter_flow(&ast);
-        assert!(result.is_ok(), "Complex causality should be handled correctly: {:?}", result);
+        assert!(
+            result.is_ok(),
+            "Complex causality should be handled correctly: {:?}",
+            result
+        );
         Ok(())
     }
 
@@ -577,12 +685,20 @@ ActionNameTestProtocol <Protocol>("protocol to test action name resolution in er
         let ast = parse_source(bmpp_source).unwrap();
         let result = validate_parameter_flow(&ast);
         assert!(result.is_err(), "Circular dependency should be detected");
-        
+
         let error_msg = result.unwrap_err().to_string();
-        assert!(!error_msg.contains("unknown_action"), 
-               "Error should not contain 'unknown_action', got: {}", error_msg);
-        assert!(error_msg.contains("step_one") || error_msg.contains("step_two") || error_msg.contains("step_three"),
-               "Error should contain actual action names, got: {}", error_msg);
+        assert!(
+            !error_msg.contains("unknown_action"),
+            "Error should not contain 'unknown_action', got: {}",
+            error_msg
+        );
+        assert!(
+            error_msg.contains("step_one")
+                || error_msg.contains("step_two")
+                || error_msg.contains("step_three"),
+            "Error should contain actual action names, got: {}",
+            error_msg
+        );
     }
 
     #[test]
@@ -609,7 +725,11 @@ LinearMultiParamProtocol <Protocol>("linear protocol with multiple parameters pe
 
         let ast = parse_source(bmpp_source)?;
         let result = validate_parameter_flow(&ast);
-        assert!(result.is_ok(), "Valid linear protocol with multiple parameters should pass: {:?}", result);
+        assert!(
+            result.is_ok(),
+            "Valid linear protocol with multiple parameters should pass: {:?}",
+            result
+        );
         Ok(())
     }
 }

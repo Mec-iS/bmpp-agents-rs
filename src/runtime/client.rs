@@ -1,6 +1,6 @@
 use crate::config::Config;
 use crate::runtime::llm_provider::LlmProvider; // Import the new trait
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use reqwest::blocking::Client;
 use serde_json::json;
 

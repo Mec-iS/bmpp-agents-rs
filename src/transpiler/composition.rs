@@ -1,5 +1,5 @@
 use crate::protocol::ast::{AstNode, AstNodeType};
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use std::collections::{HashMap, HashSet};
 
 #[derive(Debug, Clone)]
@@ -26,30 +26,33 @@ impl ProtocolRegistry {
             protocols: HashMap::new(),
         }
     }
-    
+
     /// Register a protocol in the registry for later reference
     pub fn register_protocol(&mut self, name: String, protocol: AstNode) {
         self.protocols.insert(name, protocol);
     }
-    
+
     /// Build protocol registry from a Program AST node
     pub fn from_program(program: &AstNode) -> Result<Self> {
         let mut registry = Self::new();
-        
+
         if program.node_type != AstNodeType::Program {
-            return Err(anyhow!("Expected Program node, got {:?}", program.node_type));
+            return Err(anyhow!(
+                "Expected Program node, got {:?}",
+                program.node_type
+            ));
         }
-        
+
         for protocol_node in &program.children {
             if protocol_node.node_type == AstNodeType::Protocol {
                 let protocol_name = Self::extract_protocol_name(protocol_node)?;
                 registry.register_protocol(protocol_name, (**protocol_node).clone());
             }
         }
-        
+
         Ok(registry)
     }
-    
+
     /// Extract protocol name from Protocol AST node
     fn extract_protocol_name(protocol_node: &AstNode) -> Result<String> {
         for child in &protocol_node.children {
@@ -61,13 +64,13 @@ impl ProtocolRegistry {
         }
         Err(anyhow!("Protocol name not found"))
     }
-    
+
     /// Resolve all protocol references in a protocol AST
     pub fn resolve_protocol_references(&self, protocol: &mut AstNode) -> Result<()> {
         self.resolve_references_recursive(protocol)?;
         Ok(())
     }
-    
+
     fn resolve_references_recursive(&self, node: &mut AstNode) -> Result<()> {
         match node.node_type {
             AstNodeType::ProtocolComposition => {
@@ -82,35 +85,41 @@ impl ProtocolRegistry {
         }
         Ok(())
     }
-    
+
     /// Resolve a single protocol composition
     fn resolve_composition(&self, composition_node: &mut AstNode) -> Result<()> {
         // Extract the protocol reference name
         let protocol_name = self.extract_composition_protocol_name(composition_node)?;
-        
+
         // Find the referenced protocol
-        let referenced_protocol = self.protocols.get(&protocol_name)
+        let referenced_protocol = self
+            .protocols
+            .get(&protocol_name)
             .ok_or_else(|| anyhow!("Undefined protocol: {}", protocol_name))?;
-        
+
         // Extract composition parameters
         let composition_params = self.extract_composition_parameters(composition_node)?;
-        
+
         // Validate composition parameters against the referenced protocol
-        self.validate_composition_parameters(referenced_protocol, &composition_params, &protocol_name)?;
-        
+        self.validate_composition_parameters(
+            referenced_protocol,
+            &composition_params,
+            &protocol_name,
+        )?;
+
         // Create an instance of the referenced protocol with parameter bindings
         let instance = self.create_protocol_instance(
-            referenced_protocol, 
+            referenced_protocol,
             &composition_params,
-            &protocol_name
+            &protocol_name,
         )?;
-        
+
         // Replace the composition node with the expanded instance
         *composition_node = instance;
-        
+
         Ok(())
     }
-    
+
     /// Extract protocol name from ProtocolComposition node
     fn extract_composition_protocol_name(&self, composition_node: &AstNode) -> Result<String> {
         for child in &composition_node.children {
@@ -127,11 +136,14 @@ impl ProtocolRegistry {
         }
         Err(anyhow!("Protocol reference name not found in composition"))
     }
-    
+
     /// Extract composition parameters from ProtocolComposition node
-    fn extract_composition_parameters(&self, composition_node: &AstNode) -> Result<Vec<CompositionParameter>> {
+    fn extract_composition_parameters(
+        &self,
+        composition_node: &AstNode,
+    ) -> Result<Vec<CompositionParameter>> {
         let mut parameters = Vec::new();
-        
+
         for child in &composition_node.children {
             match child.node_type {
                 AstNodeType::Identifier => {
@@ -166,42 +178,49 @@ impl ProtocolRegistry {
                     // Skip - handled separately
                 }
                 _ => {
-                    return Err(anyhow!("Unexpected child node type in composition: {:?}", child.node_type));
+                    return Err(anyhow!(
+                        "Unexpected child node type in composition: {:?}",
+                        child.node_type
+                    ));
                 }
             }
         }
-        
+
         Ok(parameters)
     }
-    
+
     /// Validate composition parameters against the referenced protocol
     fn validate_composition_parameters(
         &self,
         referenced_protocol: &AstNode,
         composition_params: &[CompositionParameter],
-        protocol_name: &str
+        protocol_name: &str,
     ) -> Result<()> {
         // Extract protocol's declared roles and parameters
         let protocol_roles = self.extract_protocol_roles(referenced_protocol);
         let protocol_parameters = self.extract_protocol_parameters(referenced_protocol);
-        
+
         // Count role identifiers and parameter flows in composition
-        let role_count = composition_params.iter()
+        let role_count = composition_params
+            .iter()
             .filter(|p| p.parameter_type == CompositionParameterType::RoleIdentifier)
             .count();
-            
-        let param_flow_count = composition_params.iter()
+
+        let param_flow_count = composition_params
+            .iter()
             .filter(|p| p.parameter_type == CompositionParameterType::ParameterFlow)
             .count();
-        
+
         // Validate role count
         if role_count != protocol_roles.len() {
             return Err(anyhow!(
                 "Role count mismatch in composition of '{}': expected {}, got {}",
-                protocol_name, protocol_roles.len(), role_count
+                protocol_name,
+                protocol_roles.len(),
+                role_count
             ));
         }
-        
+
         // Validate that all parameter flows reference declared parameters
         for param in composition_params {
             if param.parameter_type == CompositionParameterType::ParameterFlow {
@@ -213,14 +232,14 @@ impl ProtocolRegistry {
                 }
             }
         }
-        
+
         Ok(())
     }
-    
+
     /// Extract role names from a protocol
     fn extract_protocol_roles(&self, protocol: &AstNode) -> Vec<String> {
         let mut roles = Vec::new();
-        
+
         for child in &protocol.children {
             if child.node_type == AstNodeType::RolesSection {
                 for role_child in &child.children {
@@ -238,14 +257,14 @@ impl ProtocolRegistry {
                 }
             }
         }
-        
+
         roles
     }
-    
+
     /// Extract parameter names from a protocol
     fn extract_protocol_parameters(&self, protocol: &AstNode) -> Vec<String> {
         let mut parameters = Vec::new();
-        
+
         for child in &protocol.children {
             if child.node_type == AstNodeType::ParametersSection {
                 for param_child in &child.children {
@@ -263,79 +282,86 @@ impl ProtocolRegistry {
                 }
             }
         }
-        
+
         parameters
     }
-    
+
     /// Create an instance of a referenced protocol with parameter bindings
     fn create_protocol_instance(
         &self,
         referenced_protocol: &AstNode,
         composition_params: &[CompositionParameter],
-        protocol_name: &str
+        protocol_name: &str,
     ) -> Result<AstNode> {
         let mut instance = referenced_protocol.clone();
-        
+
         // Create role mappings
         let role_mappings = self.create_role_mappings(&instance, composition_params)?;
-        
+
         // Create parameter mappings
         let parameter_mappings = self.create_parameter_mappings(composition_params);
-        
+
         // Apply role and parameter mappings to the instance
         self.apply_mappings(&mut instance, &role_mappings, &parameter_mappings)?;
-        
+
         // Recursively resolve any nested references in the instance
         self.resolve_references_recursive(&mut instance)?;
-        
+
         Ok(instance)
     }
-    
+
     /// Create role name mappings for protocol instantiation
     fn create_role_mappings(
         &self,
         protocol: &AstNode,
-        composition_params: &[CompositionParameter]
+        composition_params: &[CompositionParameter],
     ) -> Result<HashMap<String, String>> {
         let protocol_roles = self.extract_protocol_roles(protocol);
-        let composition_roles: Vec<&str> = composition_params.iter()
+        let composition_roles: Vec<&str> = composition_params
+            .iter()
             .filter(|p| p.parameter_type == CompositionParameterType::RoleIdentifier)
             .map(|p| p.name.as_str())
             .collect();
-        
+
         if protocol_roles.len() != composition_roles.len() {
             return Err(anyhow!(
                 "Role count mismatch: protocol has {}, composition has {}",
-                protocol_roles.len(), composition_roles.len()
+                protocol_roles.len(),
+                composition_roles.len()
             ));
         }
-        
-        let mappings: HashMap<String, String> = protocol_roles.iter()
+
+        let mappings: HashMap<String, String> = protocol_roles
+            .iter()
             .zip(composition_roles.iter())
             .map(|(protocol_role, composition_role)| {
                 (protocol_role.clone(), composition_role.to_string())
             })
             .collect();
-        
+
         Ok(mappings)
     }
-    
+
     /// Create parameter name mappings for protocol instantiation
-    fn create_parameter_mappings(&self, composition_params: &[CompositionParameter]) -> HashMap<String, String> {
+    fn create_parameter_mappings(
+        &self,
+        composition_params: &[CompositionParameter],
+    ) -> HashMap<String, String> {
         // For now, parameters keep their original names
         // In a more sophisticated implementation, this could handle parameter renaming
-        composition_params.iter()
+        composition_params
+            .iter()
             .filter(|p| p.parameter_type == CompositionParameterType::ParameterFlow)
             .map(|p| (p.name.clone(), p.name.clone()))
             .collect()
     }
-    
+
     /// Apply role and parameter mappings to a protocol instance
     fn apply_mappings(
         &self,
         node: &mut AstNode,
         role_mappings: &HashMap<String, String>,
-        parameter_mappings: &HashMap<String, String>
+        parameter_mappings: &HashMap<String, String>,
     ) -> Result<()> {
         match node.node_type {
             AstNodeType::RoleRef => {
@@ -373,25 +399,25 @@ impl ProtocolRegistry {
             }
             _ => {}
         }
-        
+
         // Recursively apply mappings to children
         for child in &mut node.children {
             self.apply_mappings(child, role_mappings, parameter_mappings)?;
         }
-        
+
         Ok(())
     }
-    
+
     /// Get all registered protocol names
     pub fn get_protocol_names(&self) -> Vec<String> {
         self.protocols.keys().cloned().collect()
     }
-    
+
     /// Check if a protocol is registered
     pub fn has_protocol(&self, name: &str) -> bool {
         self.protocols.contains_key(name)
     }
-    
+
     /// Get a protocol by name
     pub fn get_protocol(&self, name: &str) -> Option<&AstNode> {
         self.protocols.get(name)
@@ -401,32 +427,42 @@ impl ProtocolRegistry {
 /// Validate all protocol compositions in a program
 pub fn validate_protocol_compositions(program: &AstNode) -> Result<()> {
     let registry = ProtocolRegistry::from_program(program)?;
-    
+
     // Check all protocols for composition references
     for protocol_node in &program.children {
         if protocol_node.node_type == AstNodeType::Protocol {
             validate_protocol_compositions_recursive(protocol_node, &registry)?;
         }
     }
-    
+
     Ok(())
 }
 
-fn validate_protocol_compositions_recursive(node: &AstNode, registry: &ProtocolRegistry) -> Result<()> {
+fn validate_protocol_compositions_recursive(
+    node: &AstNode,
+    registry: &ProtocolRegistry,
+) -> Result<()> {
     match node.node_type {
         AstNodeType::ProtocolComposition => {
             // Extract and validate protocol reference
             let protocol_name = extract_composition_protocol_name_for_validation(node)?;
-            
+
             if !registry.has_protocol(&protocol_name) {
-                return Err(anyhow!("Unknown protocol '{}' referenced in composition", protocol_name));
+                return Err(anyhow!(
+                    "Unknown protocol '{}' referenced in composition",
+                    protocol_name
+                ));
             }
-            
+
             // Validate composition parameters
             let composition_params = extract_composition_parameters_for_validation(node)?;
             let referenced_protocol = registry.get_protocol(&protocol_name).unwrap();
-            
-            registry.validate_composition_parameters(referenced_protocol, &composition_params, &protocol_name)?;
+
+            registry.validate_composition_parameters(
+                referenced_protocol,
+                &composition_params,
+                &protocol_name,
+            )?;
         }
         _ => {
             // Recursively validate children
@@ -435,7 +471,7 @@ fn validate_protocol_compositions_recursive(node: &AstNode, registry: &ProtocolR
             }
         }
     }
-    
+
     Ok(())
 }
 
@@ -454,9 +490,11 @@ fn extract_composition_protocol_name_for_validation(composition_node: &AstNode) 
     Err(anyhow!("Protocol reference name not found in composition"))
 }
 
-fn extract_composition_parameters_for_validation(composition_node: &AstNode) -> Result<Vec<CompositionParameter>> {
+fn extract_composition_parameters_for_validation(
+    composition_node: &AstNode,
+) -> Result<Vec<CompositionParameter>> {
     let mut parameters = Vec::new();
-    
+
     for child in &composition_node.children {
         match child.node_type {
             AstNodeType::Identifier => {
@@ -490,7 +528,7 @@ fn extract_composition_parameters_for_validation(composition_node: &AstNode) -> 
             _ => {}
         }
     }
-    
+
     Ok(parameters)
 }
 
@@ -511,15 +549,21 @@ mod tests {
             name: "TestRole".to_string(),
             direction: None,
         };
-        
+
         let flow_param = CompositionParameter {
             parameter_type: CompositionParameterType::ParameterFlow,
             name: "TestParam".to_string(),
             direction: Some("in".to_string()),
         };
-        
-        assert_eq!(role_param.parameter_type, CompositionParameterType::RoleIdentifier);
-        assert_eq!(flow_param.parameter_type, CompositionParameterType::ParameterFlow);
+
+        assert_eq!(
+            role_param.parameter_type,
+            CompositionParameterType::RoleIdentifier
+        );
+        assert_eq!(
+            flow_param.parameter_type,
+            CompositionParameterType::ParameterFlow
+        );
         assert_eq!(flow_param.direction, Some("in".to_string()));
     }
 }
