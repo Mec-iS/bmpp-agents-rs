@@ -4,40 +4,41 @@ use bmpp_agents::transpiler::{parser::parse_source, codegen::BmppCodeGenerator};
 #[test]
 fn test_protocol_composition_basic() -> Result<()> {
     let bmpp_source = r#"
-        Pack <Protocol>("Pack protocol for packaging items") {
-            roles
-                W <Agent>("Warehouse"),
-                P <Agent>("Packer"),
-                S <Agent>("Scanner")
-            parameters
-                ID <String>("unique identifier"),
-                order <String>("order details"),
-                tag <String>("package tag"),
-                package <String>("packaged item")
-            
-            W -> P: pack <Action>("pack the order")[out ID, out order]
-            P -> W: pag <Action>("tag the package")[in ID, in order, out tag]
-            P -> S: writeTag <Action>("write tag data")[in ID, in order, in tag]
-            S -> P: tagWritten <Action>("confirm tag written")[in ID, in tag, out package]
-        }
-        
-        Logistics <Protocol>("Logistics protocol using Pack") {
-            roles
-                M <Agent>("Manager"),
-                W <Agent>("Warehouse"),
-                P <Agent>("Packer"),
-                L <Agent>("Loader"),
-                S <Agent>("Scanner"),
-                C <Agent>("Courier")
-            parameters
-                ID <String>("unique identifier"),
-                order <String>("order details"),
-                delivery <String>("delivery confirmation")
-            
-            M -> W: notifyOrder <Action>("notify of new order")[out ID, out order]
-            Pack <Enactment>(W, P, S, in ID, in order, out tag, out package)
-            W -> M: deliver <Action>("confirm delivery")[in ID, in package, out delivery]
-        }
+Pack <Protocol>("Pack protocol for packaging items") {
+    roles
+        W <Agent>("Warehouse"),
+        P <Agent>("Packer"),
+        S <Agent>("Scanner")
+    parameters
+        ID <String>("unique identifier"),
+        order <String>("order details"),
+        tag <String>("package tag"),
+        package <String>("packaged item")
+    
+    W -> P: pack <Action>("pack the order")[out ID, out order]
+    P -> W: tag <Action>("tag the package")[in ID, in order, out tag]
+    P -> S: writeTag <Action>("write tag data")[in ID, in order, in tag]
+    S -> P: tagWritten <Action>("confirm tag written")[in ID, in tag, out package]
+}
+
+Logistics <Protocol>("Logistics protocol using Pack") {
+    roles
+        M <Agent>("Manager"),
+        W <Agent>("Warehouse"),
+        P <Agent>("Packer"),
+        L <Agent>("Loader"),
+        S <Agent>("Scanner"),
+        C <Agent>("Courier")
+    parameters
+        ID <String>("unique identifier"),
+        order <String>("order details"),
+        delivery <String>("delivery confirmation")
+    
+    M -> W: notifyOrder <Action>("notify of new order")[out ID, out order]
+    Pack <Enactment>[W, P, S, in ID, in order, out tag, out package]
+    W -> M: deliver <Action>("confirm delivery")[in ID, in package, out delivery]
+}
+
     "#;
     
     let ast = parse_source(bmpp_source)?;
