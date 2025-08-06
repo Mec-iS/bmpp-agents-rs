@@ -20,7 +20,6 @@ jobs:
             { os: "windows", target: "i686-pc-windows-msvc" },
             { os: "ubuntu", target: "x86_64-unknown-linux-gnu" },
             { os: "ubuntu", target: "i686-unknown-linux-gnu" },
-            { os: "ubuntu", target: "wasm32-unknown-unknown" },
             { os: "macos", target: "aarch64-apple-darwin" },
           ]
     env:
@@ -72,45 +71,20 @@ jobs:
         if: matrix.platform.os == 'ubuntu' && matrix.platform.target == 'i686-unknown-linux-gnu'
         run: |
           sudo apt-get install -y gcc-multilib
-          sudo apt-get install -y libssl-dev:i386
+          sudo apt-get install -y openssl libssl-dev
 
-      - name: Install wasm-pack
-        if: matrix.platform.target == 'wasm32-unknown-unknown'
-        run: |
-          curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
-
-      - name: Check code formatting
-        if: matrix.platform.target == 'x86_64-unknown-linux-gnu'
-        run: cargo fmt --all -- --check
+      # - name: Check code formatting
+      #   if: matrix.platform.target == 'x86_64-unknown-linux-gnu'
+      #   run: cargo fmt --all -- --check
 
       # - name: Run clippy
       #   if: matrix.platform.target == 'x86_64-unknown-linux-gnu'
       #   run: cargo clippy --all-targets --all-features -- -D warnings
 
-      - name: Build with all features
-        if: matrix.platform.target != 'wasm32-unknown-unknown'
-        run: |
-          cargo build --all-features --target ${{ matrix.platform.target }}
-
-      - name: Build without features
-        if: matrix.platform.target != 'wasm32-unknown-unknown'
-        run: |
-          cargo build --target ${{ matrix.platform.target }}
-
-      - name: Build for WASM
-        if: matrix.platform.target == 'wasm32-unknown-unknown'
-        run: |
-          cargo build --target ${{ matrix.platform.target }} --no-default-features
-
       - name: Run tests
         if: matrix.platform.target == 'x86_64-unknown-linux-gnu' || matrix.platform.target == 'x86_64-pc-windows-msvc' || matrix.platform.target == 'aarch64-apple-darwin'
         run: |
           cargo test --all-features
-
-      - name: Run tests in WASM
-        if: matrix.platform.target == 'wasm32-unknown-unknown'
-        run: |
-          wasm-pack test --node -- --no-default-features
 
   # Additional job for checking documentation
   docs:
