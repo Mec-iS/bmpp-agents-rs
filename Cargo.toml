@@ -23,6 +23,7 @@ peg = "0.8.5"
 
 [dev-dependencies]
 tempfile = "3.20.0"
+clippy = "*"
 
 [lib]
 name = "bmpp_agents"
