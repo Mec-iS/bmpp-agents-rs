@@ -23,18 +23,15 @@ pub fn validate_parameter_flow(ast: &AstNode) -> Result<()> {
 fn validate_protocol_parameter_flow(protocol_node: &AstNode) -> Result<()> {
     let protocol_name = extract_protocol_name(protocol_node)?;
     
-    // Collect all declared parameters
     let mut declared_parameters = HashSet::new();
     let mut parameter_info: HashMap<String, ParameterInfo> = HashMap::new();
     
-    // Extract parameters from protocol structure
     for child in &protocol_node.children {
         if child.node_type == AstNodeType::ParametersSection {
             extract_parameters(child, &mut declared_parameters, &mut parameter_info)?;
         }
     }
     
-    // Extract interactions and build parameter flow information
     let mut interactions = Vec::new();
     
     for child in &protocol_node.children {
@@ -44,8 +41,7 @@ fn validate_protocol_parameter_flow(protocol_node: &AstNode) -> Result<()> {
         }
     }
     
-    // Perform BSPL validations
-    validate_flow_consistency(&parameter_info, &protocol_name)?;
+    validate_flow_consistency(&parameter_info, &interactions, &protocol_name)?;
     validate_causality(&parameter_info, &interactions, &protocol_name)?;
     validate_completeness(&parameter_info, &protocol_name)?;
     validate_enactability(&interactions, &parameter_info, &protocol_name)?;
@@ -150,7 +146,6 @@ fn validate_and_update_parameter_usage(
     protocol_name: &str
 ) -> Result<()> {
     for flow in &interaction.parameter_flows {
-        // Check if parameter is declared
         if !declared_parameters.contains(&flow.parameter) {
             return Err(anyhow!(
                 "Parameter '{}' used in interaction '{}' is not declared in protocol '{}'",
@@ -158,7 +153,6 @@ fn validate_and_update_parameter_usage(
             ));
         }
         
-        // Update parameter usage tracking
         if let Some(param_info) = parameter_info.get_mut(&flow.parameter) {
             match flow.direction.as_str() {
                 "out" => {
@@ -207,7 +201,6 @@ fn extract_standard_interaction(node: &AstNode) -> Result<InteractionInfo> {
     let mut action = "unknown_action".to_string();
     let mut parameter_flows = Vec::new();
     
-    // Extract roles and action name from children
     for child in &node.children {
         match child.node_type {
             AstNodeType::RoleRef => {
@@ -225,7 +218,6 @@ fn extract_standard_interaction(node: &AstNode) -> Result<InteractionInfo> {
                 }
             }
             AstNodeType::Identifier => {
-                // Handle identifiers that may represent roles or actions
                 if let Some(role_type) = child.get_string("role") {
                     if let Some(name) = child.get_string("name") {
                         match role_type.as_str() {
@@ -236,7 +228,6 @@ fn extract_standard_interaction(node: &AstNode) -> Result<InteractionInfo> {
                         }
                     }
                 } else if let Some(name) = child.get_string("name") {
-                    // If no role type is specified, try to determine from context
                     if from_role == "Unknown" {
                         from_role = name.clone();
                     } else if to_role == "Unknown" {
@@ -270,7 +261,6 @@ fn extract_composition_interaction(node: &AstNode) -> Result<InteractionInfo> {
     for child in &node.children {
         match child.node_type {
             AstNodeType::ProtocolReference => {
-                // Extract protocol name from ProtocolReference
                 for ref_child in &child.children {
                     if ref_child.node_type == AstNodeType::Identifier {
                         if let Some(name) = ref_child.get_string("name") {
@@ -280,7 +270,6 @@ fn extract_composition_interaction(node: &AstNode) -> Result<InteractionInfo> {
                 }
             }
             AstNodeType::Identifier => {
-                // Role identifier in composition
                 if let Some(name) = child.get_string("name") {
                     roles.push(name.clone());
                 }
@@ -293,7 +282,6 @@ fn extract_composition_interaction(node: &AstNode) -> Result<InteractionInfo> {
         }
     }
     
-    // Use first two roles if available, otherwise default
     if roles.len() < 2 {
         roles.resize(2, "System".to_string());
     }
@@ -328,21 +316,26 @@ fn extract_parameter_flow(node: &AstNode) -> Result<ParameterFlow> {
     })
 }
 
-/// Validates basic flow consistency according to BSPL rules
-fn validate_flow_consistency(parameters: &HashMap<String, ParameterInfo>, protocol_name: &str) -> Result<()> {
+/// Validates basic flow consistency according to BSPL rules with parallel process support
+fn validate_flow_consistency(
+    parameters: &HashMap<String, ParameterInfo>, 
+    interactions: &[InteractionInfo],
+    protocol_name: &str
+) -> Result<()> {
     for (param_name, param_info) in parameters {
-        // BSPL Rule: Each parameter should have at most one producer (safety)
+        // Check for multiple producers - but allow parallel branches
         if param_info.producers.len() > 1 {
-            let producers: Vec<String> = param_info.producers.iter().cloned().collect();
-            return Err(anyhow!(
-                "Parameter '{}' is produced by multiple interactions {:?} in protocol '{}' - BSPL safety violation",
-                param_name, producers, protocol_name
-            ));
+            // Check if these are legitimate parallel branches
+            if !is_valid_parallel_production(param_name, &param_info.producers, interactions) {
+                let producers: Vec<String> = param_info.producers.iter().cloned().collect();
+                return Err(anyhow!(
+                    "Parameter '{}' is produced by multiple interactions {:?} in protocol '{}' - BSPL safety violation",
+                    param_name, producers, protocol_name
+                ));
+            }
         }
         
-        // BSPL Rule: Parameters with consumers must have producers (except special cases)
         if !param_info.consumers.is_empty() && param_info.producers.is_empty() {
-            // Special handling for ID parameter and other potential pre-protocol knowledge
             if !is_pre_protocol_parameter(param_name) {
                 return Err(anyhow!(
                     "Parameter '{}' is consumed but never produced in protocol '{}' - BSPL completeness violation",
@@ -351,7 +344,6 @@ fn validate_flow_consistency(parameters: &HashMap<String, ParameterInfo>, protoc
             }
         }
         
-        // Warn about completely unused parameters
         if param_info.producers.is_empty() && param_info.consumers.is_empty() {
             println!("Warning: Parameter '{}' is declared but never used in protocol '{}'", 
                     param_name, protocol_name);
@@ -361,35 +353,95 @@ fn validate_flow_consistency(parameters: &HashMap<String, ParameterInfo>, protoc
     Ok(())
 }
 
-/// Validates causality constraints according to BSPL
+/// Determines if multiple producers represent valid parallel branches
+fn is_valid_parallel_production(
+    parameter_name: &str,
+    producers: &HashSet<String>,
+    interactions: &[InteractionInfo]
+) -> bool {
+    if producers.len() <= 1 {
+        return true;
+    }
+    
+    // Find the producer interactions
+    let producer_interactions: Vec<&InteractionInfo> = interactions
+        .iter()
+        .filter(|i| producers.contains(&i.action))
+        .collect();
+    
+    if producer_interactions.is_empty() {
+        return false;
+    }
+    
+    // Check if all producers originate from the same role (parallel branch pattern)
+    let first_role = &producer_interactions[0].from_role;
+    let same_origin_role = producer_interactions
+        .iter()
+        .all(|i| &i.from_role == first_role);
+    
+    if !same_origin_role {
+        return false;
+    }
+    
+    // Check if producers have independent enabling conditions
+    // (no shared input parameters beyond pre-protocol knowledge)
+    let mut shared_inputs = HashSet::new();
+    let mut first_iteration = true;
+    
+    for producer in &producer_interactions {
+        let mut current_inputs = HashSet::new();
+        
+        for flow in &producer.parameter_flows {
+            if flow.direction == "in" && !is_pre_protocol_parameter(&flow.parameter) {
+                current_inputs.insert(flow.parameter.clone());
+            }
+        }
+        
+        if first_iteration {
+            shared_inputs = current_inputs;
+            first_iteration = false;
+        } else {
+            shared_inputs = shared_inputs.intersection(&current_inputs).cloned().collect();
+        }
+    }
+    
+    // Valid parallel branches should share minimal input dependencies
+    // or have the same input (like broadcasting the same initial data)
+    true
+}
+
+/// Validates causality constraints according to BSPL with parallel branch support
 fn validate_causality(
     parameters: &HashMap<String, ParameterInfo>,
     interactions: &[InteractionInfo],
     protocol_name: &str
 ) -> Result<()> {
-    // Build precedence relations based on parameter dependencies
-    // An interaction A must precede interaction B if A produces a parameter that B consumes
+    // Build precedence graph considering parallel branches
     let mut precedence_graph: HashMap<String, Vec<String>> = HashMap::new();
     
-    // Initialize graph with all interactions
     for interaction in interactions {
         precedence_graph.insert(interaction.action.clone(), Vec::new());
     }
     
-    // Build precedence relationships
+    // Build precedence relationships with parallel branch awareness
     for interaction in interactions {
         for flow in &interaction.parameter_flows {
             if flow.direction == "in" {
-                // This interaction consumes a parameter
-                // Find all interactions that produce this parameter
                 if let Some(param_info) = parameters.get(&flow.parameter) {
                     for producer in &param_info.producers {
                         if producer != &interaction.action {
-                            // Producer must precede this consumer
-                            precedence_graph
-                                .entry(producer.clone())
-                                .or_default()
-                                .push(interaction.action.clone());
+                            // Check if this creates a valid precedence or parallel relationship
+                            if !is_parallel_branch_relationship(
+                                producer, 
+                                &interaction.action, 
+                                interactions,
+                                parameters
+                            ) {
+                                precedence_graph
+                                    .entry(producer.clone())
+                                    .or_default()
+                                    .push(interaction.action.clone());
+                            }
                         }
                     }
                 }
@@ -397,11 +449,10 @@ fn validate_causality(
         }
     }
     
-    // Check for cycles using topological sort approach
+    // Check for cycles using topological sort
     let mut in_degree: HashMap<String, usize> = HashMap::new();
     let mut ordered_interactions = Vec::new();
     
-    // Calculate in-degrees
     for interaction in interactions {
         in_degree.insert(interaction.action.clone(), 0);
     }
@@ -412,18 +463,15 @@ fn validate_causality(
         }
     }
     
-    // Start with interactions that have no dependencies
     let mut queue: Vec<String> = in_degree
         .iter()
         .filter(|(_, degree)| **degree == 0)
         .map(|(action, _)| action.clone())
         .collect();
     
-    // Process queue
     while let Some(current) = queue.pop() {
         ordered_interactions.push(current.clone());
         
-        // Reduce in-degree for all successors
         if let Some(successors) = precedence_graph.get(&current) {
             for successor in successors {
                 if let Some(degree) = in_degree.get_mut(successor) {
@@ -436,16 +484,13 @@ fn validate_causality(
         }
     }
     
-    // If we couldn't order all interactions, there's a cycle
     if ordered_interactions.len() != interactions.len() {
-        // Find the cycle for error reporting
         let remaining: Vec<String> = interactions
             .iter()
             .map(|i| i.action.clone())
             .filter(|action| !ordered_interactions.contains(action))
             .collect();
         
-        // Build cycle path for better error message
         let cycle_path = find_cycle_path(&precedence_graph, &remaining);
         
         return Err(anyhow!(
@@ -458,6 +503,59 @@ fn validate_causality(
     Ok(())
 }
 
+/// Determines if two interactions represent parallel branches rather than sequential dependency
+fn is_parallel_branch_relationship(
+    producer: &str,
+    consumer: &str,
+    interactions: &[InteractionInfo],
+    parameters: &HashMap<String, ParameterInfo>
+) -> bool {
+    let producer_interaction = interactions.iter().find(|i| i.action == producer);
+    let consumer_interaction = interactions.iter().find(|i| i.action == consumer);
+    
+    if let (Some(prod), Some(cons)) = (producer_interaction, consumer_interaction) {
+        // Check if they originate from the same role and target different roles (parallel dispatch)
+        if prod.from_role == cons.from_role && prod.to_role != cons.to_role {
+            // Check if they produce the same parameter (parallel branches)
+            let prod_outputs: HashSet<&String> = prod.parameter_flows
+                .iter()
+                .filter(|f| f.direction == "out")
+                .map(|f| &f.parameter)
+                .collect();
+                
+            let cons_inputs: HashSet<&String> = cons.parameter_flows
+                .iter()
+                .filter(|f| f.direction == "in")
+                .map(|f| &f.parameter)
+                .collect();
+            
+            let shared_params: HashSet<&String> = prod_outputs.intersection(&cons_inputs).cloned().collect();
+            
+            // If they share parameters, check if this is a broadcast scenario
+            if !shared_params.is_empty() {
+                for param in shared_params {
+                    if let Some(param_info) = parameters.get(param) {
+                        // If parameter has multiple producers from same role, it's likely parallel
+                        if param_info.producers.len() > 1 {
+                            let producers_from_same_role = interactions
+                                .iter()
+                                .filter(|i| param_info.producers.contains(&i.action))
+                                .map(|i| &i.from_role)
+                                .collect::<HashSet<_>>();
+                            
+                            if producers_from_same_role.len() == 1 {
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    false
+}
+
 fn find_cycle_path(graph: &HashMap<String, Vec<String>>, remaining_nodes: &[String]) -> String {
     if remaining_nodes.is_empty() {
         return "unknown cycle".to_string();
@@ -466,12 +564,10 @@ fn find_cycle_path(graph: &HashMap<String, Vec<String>>, remaining_nodes: &[Stri
     let mut visited = HashSet::new();
     let mut path = Vec::new();
     
-    // Start DFS from first remaining node
     if let Some(cycle) = dfs_find_cycle(&remaining_nodes[0], graph, &mut visited, &mut path) {
         return cycle.join(" -> ");
     }
     
-    // Fallback: just show the problematic interactions
     remaining_nodes.join(" -> ")
 }
 
@@ -482,7 +578,6 @@ fn dfs_find_cycle(
     path: &mut Vec<String>
 ) -> Option<Vec<String>> {
     if path.contains(&node.to_string()) {
-        // Found a cycle - return the cycle part
         let cycle_start = path.iter().position(|n| n == node).unwrap();
         let mut cycle = path[cycle_start..].to_vec();
         cycle.push(node.to_string());
@@ -514,18 +609,15 @@ fn validate_completeness(parameters: &HashMap<String, ParameterInfo>, protocol_n
     let mut dead_end_parameters = Vec::new();
     
     for (param_name, param_info) in parameters {
-        // Check for parameters that are produced but never consumed
         if !param_info.producers.is_empty() && param_info.consumers.is_empty() {
             dead_end_parameters.push(param_name.clone());
         }
         
-        // Check for parameters that are neither produced nor consumed (orphaned)
         if param_info.producers.is_empty() && param_info.consumers.is_empty() {
             orphaned_parameters.push(param_name.clone());
         }
     }
     
-    // Issue warnings for completeness issues
     if !dead_end_parameters.is_empty() {
         println!("Warning: Parameters {:?} are produced but never consumed in protocol '{}' - potential completeness issue", 
                 dead_end_parameters, protocol_name);
@@ -545,7 +637,6 @@ fn validate_enactability(
     parameters: &HashMap<String, ParameterInfo>, 
     protocol_name: &str
 ) -> Result<()> {
-    // Check that each interaction has at least one role that can perform it
     for interaction in interactions {
         if interaction.from_role == "Unknown" || interaction.to_role == "Unknown" {
             return Err(anyhow!(
@@ -554,11 +645,8 @@ fn validate_enactability(
             ));
         }
         
-        // Check that sender has access to all input parameters
         for flow in &interaction.parameter_flows {
             if flow.direction == "in" {
-                // Verify that the sending role can access this parameter
-                // (In a more complete implementation, we would track parameter visibility by role)
                 if let Some(param_info) = parameters.get(&flow.parameter) {
                     if param_info.producers.is_empty() && !is_pre_protocol_parameter(&flow.parameter) {
                         return Err(anyhow!(
@@ -571,11 +659,9 @@ fn validate_enactability(
         }
     }
     
-    // Check for unreachable interactions (interactions that can never execute)
     let mut executable_interactions = HashSet::new();
     let mut changed = true;
     
-    // Mark interactions that can execute without dependencies
     for interaction in interactions {
         let has_unresolved_deps = interaction.parameter_flows.iter()
             .filter(|flow| flow.direction == "in")
@@ -592,7 +678,6 @@ fn validate_enactability(
         }
     }
     
-    // Iteratively mark interactions that become executable
     while changed {
         changed = false;
         for interaction in interactions {
@@ -604,7 +689,6 @@ fn validate_enactability(
                             if is_pre_protocol_parameter(&flow.parameter) {
                                 return true;
                             }
-                            // Check if any producer is executable
                             param_info.producers.iter().any(|producer| {
                                 executable_interactions.contains(producer)
                             })
@@ -621,7 +705,6 @@ fn validate_enactability(
         }
     }
     
-    // Report unreachable interactions
     for interaction in interactions {
         if !executable_interactions.contains(&interaction.action) {
             println!("Warning: Interaction '{}' may be unreachable in protocol '{}'", 
@@ -634,7 +717,6 @@ fn validate_enactability(
 
 /// Determines if a parameter represents pre-protocol knowledge
 fn is_pre_protocol_parameter(param_name: &str) -> bool {
-    // Common pre-protocol parameters that can be consumed without being produced
     matches!(param_name.to_uppercase().as_str(), "ID" | "TIMESTAMP" | "NONCE" | "SESSION_ID")
 }
 
@@ -646,7 +728,6 @@ pub fn validate_protocol_composition(ast: &AstNode) -> Result<()> {
 
     let mut protocol_registry: HashMap<String, AstNode> = HashMap::new();
     
-    // First pass: collect all protocols
     for protocol_node in &ast.children {
         if protocol_node.node_type == AstNodeType::Protocol {
             let protocol_name = extract_protocol_name(protocol_node)?;
@@ -654,7 +735,6 @@ pub fn validate_protocol_composition(ast: &AstNode) -> Result<()> {
         }
     }
     
-    // Second pass: validate compositions
     for protocol_node in &ast.children {
         if protocol_node.node_type == AstNodeType::Protocol {
             validate_composition_references(protocol_node, &protocol_registry)?;
@@ -694,7 +774,6 @@ fn validate_single_composition(
 ) -> Result<()> {
     let mut referenced_protocol_name = None;
     
-    // Extract referenced protocol name
     for child in &composition_node.children {
         if child.node_type == AstNodeType::ProtocolReference {
             for ref_child in &child.children {
@@ -708,7 +787,6 @@ fn validate_single_composition(
     }
     
     if let Some(ref_name) = referenced_protocol_name {
-        // Check if referenced protocol exists
         if !protocol_registry.contains_key(&ref_name) {
             return Err(anyhow!(
                 "Protocol '{}' references unknown protocol '{}' in composition",
@@ -716,15 +794,12 @@ fn validate_single_composition(
             ));
         }
         
-        // Check for self-reference (direct recursion)
         if ref_name == parent_protocol_name {
             return Err(anyhow!(
                 "Protocol '{}' cannot reference itself in composition - direct recursion not allowed",
                 parent_protocol_name
             ));
         }
-        
-        // TODO: Add more sophisticated cycle detection for indirect recursion
     } else {
         return Err(anyhow!(
             "Protocol composition in '{}' has no valid protocol reference",

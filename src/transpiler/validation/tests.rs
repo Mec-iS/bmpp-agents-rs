@@ -313,6 +313,7 @@ CausalityChainProtocol <Protocol>("protocol with proper causality chain") {
         Ok(())
     }
 
+    // distinguish between true multiple producers (safety violation) and parallel producers (valid BSPL pattern).
     #[test]
     fn test_valid_parallel_causality() -> Result<()> {
         let bmpp_source = r#"
