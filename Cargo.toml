@@ -29,7 +29,7 @@ name = "bmpp_agents"
 crate-type = ["rlib"]
 
 [[bin]]
-name = "bmpp-agents"
+name = "bmpp"
 path = "src/main.rs"
 
 [profile.test]

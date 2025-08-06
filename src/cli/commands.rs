@@ -105,8 +105,7 @@ fn parse_command(input: &Path, output_ast: bool, validate: bool, verbose: bool) 
     }
     
     if output_ast {
-        println!("\n--- AST Debug Output ---");
-        print_ast_debug(&ast, 0);
+        println!("\n--- AST Debug Output --- \n {}", &ast);
     }
     
     if validate {
@@ -528,20 +527,6 @@ Respond with ONLY the BMPP protocol syntax, no additional explanation.
 }
 
 // Helper functions
-
-fn print_ast_debug(node: &crate::protocol::ast::AstNode, depth: usize) {
-    let indent = "  ".repeat(depth);
-    println!("{}🌳 {:?}", indent, node.node_type);
-    
-    for (key, value) in &node.properties {
-        println!("{}  📝 {}: {:?}", indent, key, value);
-    }
-    
-    for child in &node.children {
-        print_ast_debug(child, depth + 1);
-    }
-}
-
 fn validate_protocol_semantics(ast: &crate::protocol::ast::AstNode) -> Result<()> {
     if ast.children.is_empty() {
         return Err(anyhow!("Protocol must contain at least one protocol definition"));

@@ -262,33 +262,3 @@ pub fn parse_source(source: &str) -> Result<AstNode> {
     }
 }
 
-// Debug helper function for testing
-pub fn _print_ast_debug(node: &AstNode, max_depth: usize) {
-    fn print_recursive(node: &AstNode, depth: usize, max_depth: usize) {
-        if depth > max_depth {
-            return;
-        }
-        
-        let indent = "  ".repeat(depth);
-        println!("{}AstNode {{ node_type: {:?}, children: [", indent, node.node_type);
-        
-        if !node.properties.is_empty() {
-            println!("{}  properties: {{", indent);
-            for (key, value) in &node.properties {
-                println!("{}    \"{}\": {:?}", indent, key, value);
-            }
-            println!("{}  }}", indent);
-        }
-        
-        for child in &node.children {
-            print_recursive(child, depth + 1, max_depth);
-        }
-        
-        println!("{}]", indent);
-        if depth == 0 {
-            println!("}}");
-        }
-    }
-    
-    print_recursive(node, 0, max_depth);
-}

@@ -24,7 +24,7 @@ Or build from source:
 git clone <repository-url>
 cd bmpp-agents
 cargo build --release
-cargo test
+cargo test --no-capture
 ```
 
 ## Quick Start
@@ -46,7 +46,7 @@ bmpp validate myprotocol.bmpp --flow-check --semantic-check
 ### 3. Generate Rust code
 
 ```
-bmpp transpile myprotocol.bmpp ./output --target rust --include-validators
+bmpp transpile myprotocol.bmpp --target rust --include-validators
 ```
 
 ### 4. Convert protocol to natural language
@@ -363,7 +363,7 @@ pub fn check_liveness(protocol: &Protocol) -> Result<bool> {
 ```
 
 
-### 3. **Protocol Composition and References** (from `protocol.py`)
+### DONE ~3. **Protocol Composition and References** (from `protocol.py`)~
 
 Enhance the protocol system to support sub-protocols and composition:
 
@@ -414,7 +414,7 @@ pub enum Commands {
 ```
 
 
-### 5. **Enhanced Error Reporting** (inspired by BSPL's validation)
+### 5. DONE ~**Enhanced Error Reporting** (inspired by BSPL's validation)~
 
 Add more detailed error reporting with suggestions:
 

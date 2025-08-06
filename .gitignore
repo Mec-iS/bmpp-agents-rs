@@ -7,6 +7,7 @@
 # configure your local ignore list.
 
 generated/
+output/
 
 ## File system
 .DS_Store
