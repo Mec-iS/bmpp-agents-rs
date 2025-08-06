@@ -1,6 +1,6 @@
 use crate::protocol::ast::{AstNode, AstNodeType};
 use anyhow::{anyhow, Result};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
 pub struct ProtocolRegistry {

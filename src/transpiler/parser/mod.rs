@@ -2,7 +2,6 @@ pub mod tests;
 
 use crate::protocol::ast::{AstNode, AstNodeType};
 use anyhow::{anyhow, Result};
-use peg::parser;
 
 // PEG grammar embedded in Rust
 peg::parser! {
