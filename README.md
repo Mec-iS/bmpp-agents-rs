@@ -8,65 +8,298 @@ BMPP is a formal protocol to define LLM interactions for LLM systems interoperab
 
 This repo requires [Rust](https://www.rust-lang.org/tools/install) to run.
 
-## implementation details
-* Rust has been picked because of its type system and the formal safety of its compiler, and a good trade-off between its modern features and runtime performance. It can also be easily embedded in Python via [`pyO3`](https://github.com/PyO3/pyo3), a well-supported Python bindings library.
-* this repo transpile BMPP files to Rust but any language can be supported.
-* it uses the [`pest` library](https://pest.rs/) for grammar management.
+## Overview
 
-**TODO**:
-* port all the features from https://gitlab.com/masr/bspl (formal validition)
-* implement other OpenAI-compliant remote APIs
-* implement transpiling to vanilla Python or LangChain/GraphChain
+BMPP enables organizations to define unambiguous protocols for LLM and Web Agent interactions, ensuring interoperability between different systems while maintaining semantic clarity through natural language annotations.
 
-## Build
+## Installation
+
 ```
-$ cargo build
-```
-Run tests:
-```
-$ cargo test
+cargo install bmpp-agents
 ```
 
-## Usage
+Or build from source:
 
-### Base usage for parsing and transpiling:
 ```
-# Parse and validate a protocol
-cargo run parse protocol.bmpp --validate
-
-# Transpile to Rust
-cargo run transpile protocol.bmpp --output-dir ./generated --target rust
-
-# Validate protocol semantics
-cargo run validate protocol.bmpp --semantic-check --flow-check
-
-# Format a protocol file
-cargo run format protocol.bmpp --in-place
-
-# Create a new protocol from template
-cargo run init MyProtocol --template basic --output my_protocol.bmpp
+git clone <repository-url>
+cd bmpp-agents
+cargo build --release
+cargo test --no-capture
 ```
 
-### Integration with local Ollama for NL:
+## Quick Start
 
-Need Ollama installed, see below.
+### 1. Create a new protocol
+
 ```
-# Convert a BMPP protocol to natural language
-cargo run from-protocol protocol.bmpp --style detailed --output description.txt
-
-# Convert natural language to BMPP protocol
-cargo run to-protocol "A simple protocol where a customer requests a quote from a supplier" --output generated_protocol.bmpp
-
-# Read from file and generate protocol with validation
-cargo run to-protocol requirements.txt --input-file --max-attempts 5
-
-# Generate without validation (useful for debugging)
-cargo run to-protocol "A three-party negotiation protocol" --skip-validation
-
-# Verbose mode for detailed output
-cargo run from-protocol protocol.bmpp --verbose --style technical
+bmpp init MyProtocol --template basic
 ```
 
+This creates a `myprotocol.bmpp` file with a basic template.
+
+### 2. Validate your protocol
+
+```
+bmpp validate myprotocol.bmpp --flow-check --semantic-check
+```
+
+### 3. Generate Rust code
+
+```
+bmpp transpile myprotocol.bmpp --target rust --include-validators
+```
+
+### 4. Convert protocol to natural language
+
+```
+bmpp from-protocol myprotocol.bmpp --style detailed
+```
+
+## Commands
+
+### `bmpp parse`
+
+Parse and analyze BMPP protocol files.
+
+```
+bmpp parse <INPUT> [OPTIONS]
+```
+
+**Options:**
+- `--output-ast`: Display the Abstract Syntax Tree
+- `--validate`: Run validation checks during parsing
+- `--verbose`: Show detailed parsing information
+
+**Example:**
+```
+bmpp parse protocol.bmpp --output-ast --validate --verbose
+```
+
+### `bmpp validate`
+
+Comprehensive protocol validation according to BSPL standards.
+
+```
+bmpp validate <INPUT> [OPTIONS]
+```
+
+**Options:**
+- `--semantic-check`: Validate protocol structure and semantics
+- `--flow-check`: Validate parameter flow consistency and BSPL rules
+- `--verbose`: Show detailed validation results
+
+**Validation includes:**
+- **Safety**: Multiple producers detection
+- **Completeness**: Unused parameters and unreachable interactions
+- **Causality**: Circular dependency detection
+- **Enactability**: Protocol executability validation
+- **Composition**: Protocol reference validation
+
+**Example:**
+```
+bmpp validate complex-protocol.bmpp --semantic-check --flow-check --verbose
+```
+
+### `bmpp transpile`
+
+Generate executable code from BMPP protocols.
+
+```
+bmpp transpile <INPUT> <OUTPUT_DIR> [OPTIONS]
+```
+
+**Options:**
+- `--target <TARGET>`: Target language (currently supports `rust`)
+- `--include-validators`: Generate validation code
+- `--verbose`: Show compilation details
+
+**Generated files:**
+- `lib.rs`: Main protocol implementation
+- `validator.rs`: Protocol validation logic (with `--include-validators`)
+- `Cargo.toml`: Rust project configuration
+
+**Example:**
+```
+bmpp transpile protocol.bmpp ./generated --target rust --include-validators
+```
+
+### `bmpp init`
+
+Initialize new BMPP protocol from templates.
+
+```
+bmpp init <NAME> [OPTIONS]
+```
+
+**Options:**
+- `--output <PATH>`: Output file path
+- `--template <TYPE>`: Template type (`basic`, `multi-party`, `composition`)
+
+**Templates:**
+- **basic**: Simple two-party protocol
+- **multi-party**: Three-party coordination protocol
+- **composition**: Protocol with sub-protocol composition
+
+**Example:**
+```
+bmpp init ShippingProtocol --template multi-party --output shipping.bmpp
+```
+
+### `bmpp format`
+
+Format BMPP protocol files for consistency.
+
+```
+bmpp format <INPUT> [OPTIONS]
+```
+
+**Options:**
+- `--in-place`: Format file in place
+- `--stdout`: Output to stdout instead of file
+
+**Example:**
+```
+bmpp format protocol.bmpp --in-place
+```
+
+### `bmpp from-protocol`
+
+Convert BMPP protocols to natural language descriptions using LLM.
+
+```
+bmpp from-protocol <INPUT> [OPTIONS]
+```
+
+**Options:**
+- `--output <PATH>`: Save description to file
+- `--style <STYLE>`: Description style (`summary`, `detailed`, `technical`)
+
+**Requirements:**
+- Ollama running locally (`http://localhost:11434`)
+- Set environment variables for LLM configuration
+
+**Example:**
+```
+bmpp from-protocol protocol.bmpp --style detailed --output description.md
+```
+
+### `bmpp to-protocol`
+
+Generate BMPP protocols from natural language descriptions using LLM.
+
+```
+bmpp to-protocol <INPUT> [OPTIONS]
+```
+
+**Options:**
+- `--input-file`: Treat input as file path instead of text
+- `--output <PATH>`: Save generated protocol to file
+- `--skip-validation`: Skip protocol validation
+- `--max-attempts <N>`: Maximum generation attempts (default: 3)
+
+**Example:**
+```
+bmpp to-protocol "A purchasing protocol between buyer and seller with quote requests" --output purchase.bmpp
+
+# Or from file:
+
+bmpp to-protocol requirements.txt --input-file --output protocol.bmpp --max-attempts 5
+```
+
+## BMPP Protocol Syntax
+
+### Basic Structure
+
+```
+ProtocolName <Protocol>("Description of the protocol") {
+roles
+RoleA <Agent>("Description of role A"),
+RoleB <Agent>("Description of role B")
+
+    parameters
+        param1 <String>("Semantic meaning of parameter 1"),
+        param2 <Int>("Semantic meaning of parameter 2")
+    
+    RoleA -> RoleB: action1 <Action>("Description of action")[out param1]
+    RoleB -> RoleA: response <Action>("Description of response")[in param1, out param2]
+    }
+```
+
+### Protocol Composition
+
+```
+MainProtocol <Protocol>("Main protocol with composition") {
+roles
+Client <Agent>("The client"),
+Server <Agent>("The server"),
+Processor <Agent>("The processor")
+
+    parameters
+        request <String>("The request data"),
+        result <String>("The processing result")
+    
+    Client -> Server: initiate <Action>("Start processing")[out request]
+    SubProtocol <Enactment>(Server, Processor, in request, out result)
+    Server -> Client: complete <Action>("Return result")[in result]
+    }
+
+SubProtocol <Protocol>("Sub-protocol for processing") {
+roles
+Coordinator <Agent>("Coordinates processing"),
+Worker <Agent>("Performs work")
+
+    parameters
+        input <String>("Input data"),
+        output <String>("Output data")
+    
+    Coordinator -> Worker: process <Action>("Process data")[in input, out output]
+    }
+```
+
+### Key Elements
+
+- **Protocols**: Defined with `<Protocol>` tag and semantic descriptions
+- **Roles**: Participating agents with `<Agent>` tag
+- **Parameters**: Typed data with semantic annotations
+- **Interactions**: Message flows between roles with parameter directions
+- **Composition**: Sub-protocol invocation with `<Enactment>` tag
+- **Types**: `String`, `Int`, `Float`, `Bool`
+- **Directions**: `in` (input), `out` (output)
+
+## Configuration
+
+Set environment variables for LLM integration:
+
+```
+export OLLAMA_HOST=http://localhost:11434
+export OLLAMA_MODEL=llama2  \# or your preferred model
+```
+
+## Validation Rules (BSPL Compliance)
+
+BMPP enforces BSPL standards:
+
+1. **Safety**: Each parameter has at most one producer
+2. **Completeness**: No orphaned or unreachable parameters
+3. **Causality**: No circular dependencies between interactions
+4. **Enactability**: All interactions can be executed by their roles
+5. **Composition**: Valid protocol references and role mappings
+
+## Examples
+
+See the `examples/` directory for complete protocol examples:
+- Basic purchase protocol
+- Multi-party logistics
+- Protocol composition scenarios
+- LLM agent interaction patterns
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Add tests for new functionality
+4. Ensure all tests pass: `cargo test`
+5. Submit a pull request
 
 
 ## Install Ollama
@@ -130,7 +363,7 @@ pub fn check_liveness(protocol: &Protocol) -> Result<bool> {
 ```
 
 
-### 3. **Protocol Composition and References** (from `protocol.py`)
+### DONE ~3. **Protocol Composition and References** (from `protocol.py`)~
 
 Enhance the protocol system to support sub-protocols and composition:
 
@@ -181,7 +414,7 @@ pub enum Commands {
 ```
 
 
-### 5. **Enhanced Error Reporting** (inspired by BSPL's validation)
+### 5. DONE ~**Enhanced Error Reporting** (inspired by BSPL's validation)~
 
 Add more detailed error reporting with suggestions:
 

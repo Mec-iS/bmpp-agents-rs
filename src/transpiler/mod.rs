@@ -1,10 +1,11 @@
-pub mod parser;
 pub mod codegen;
+pub mod composition;
+pub mod parser;
 pub mod project_builder;
 pub mod validation;
 
-pub use parser::parse_source;
 pub use codegen::BmppCodeGenerator;
+pub use parser::parse_source;
 
 use anyhow::Result;
 

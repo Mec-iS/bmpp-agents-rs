@@ -1,0 +1,68 @@
+<program> ::= <protocol> | <program> <protocol>
+
+<protocol> ::= <protocol-name> "<Protocol>" <annotation> "{"
+               <roles-section>
+               <parameters-section>  
+               <interaction-section>
+               "}"
+
+<protocol-name> ::= <identifier>
+
+<annotation> ::= "(" <string-literal> ")"
+
+<roles-section> ::= "roles" <role-list>
+
+<role-list> ::= <role-decl> | <role-list> "," <role-decl>
+
+<role-decl> ::= <identifier> "<Agent>" <annotation>
+
+<parameters-section> ::= "parameters" <parameter-list>
+
+<parameter-list> ::= <parameter-decl> | <parameter-list> "," <parameter-decl>
+
+<parameter-decl> ::= <identifier> "<" <basic-type> ">" <annotation>
+
+<basic-type> ::= "String" | "Int" | "Float" | "Bool"
+
+<interaction-section> ::= <interaction-item> | <interaction-section> <interaction-item>
+
+<interaction-item> ::= <standard-interaction> | <protocol-composition>
+
+<standard-interaction> ::= <role-ref> "->" <role-ref> ":" <action-name>
+                           "<Action>" <annotation> "[" <parameter-flow-list-opt> "]"
+
+<protocol-composition> ::= <protocol-reference> "[" <composition-parameter-list-opt> "]"
+
+<protocol-reference> ::= <identifier> "<Enactment>"
+
+<parameter-flow-list-opt> ::= <empty> | <parameter-flow-list>
+
+<parameter-flow-list> ::= <parameter-flow> | <parameter-flow-list> "," <parameter-flow>
+
+<parameter-flow> ::= <direction> <identifier>
+
+<composition-parameter-list-opt> ::= <empty> | <composition-parameter-list>
+
+<composition-parameter-list> ::= <composition-parameter> | <composition-parameter-list> "," <composition-parameter>
+
+<composition-parameter> ::= <parameter-flow> | <identifier>
+
+<direction> ::= "in" | "out"
+
+<role-ref> ::= <identifier>
+
+<action-name> ::= <identifier>
+
+<identifier> ::= <letter> | <identifier> <letter> | <identifier> <digit> | <identifier> "_"
+
+<string-literal> ::= "\"" <string-chars> "\""
+
+<string-chars> ::= <empty> | <string-chars> <string-char>
+
+<string-char> ::= <any-char-except-quote>
+
+<letter> ::= "a" | "b" | ... | "z" | "A" | "B" | ... | "Z"
+
+<digit> ::= "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"
+
+<empty> ::= 

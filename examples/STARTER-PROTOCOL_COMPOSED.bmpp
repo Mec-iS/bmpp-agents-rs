@@ -1,0 +1,70 @@
+Logistics <Protocol>("Multi-party logistics protocol to describe the exchange of goods between stakeholders in the same supplychain") {
+    roles
+        M <Agent>("Merchant coordinating the logistics"),
+        W <Agent>("Warehouse managing inventory"),
+        P <Agent>("Packer handling packaging operations"),
+        L <Agent>("Loader managing loading operations"),
+        S <Agent>("Scanner providing scanning services"),
+        C <Agent>("Courier handling transportation")
+    
+    parameters
+        ID <String>("unique identifier for the logistics operation"),
+        order <String>("order details and specifications"),
+        delivery <String>("delivery confirmation and status"),
+        tag <String>("package identification tag"),
+        package <String>("packaged item ready for shipping"),
+        route <String>("transportation route information")
+    
+    M -> W: NotifyOrder <Action>("merchant notifies warehouse of new order")[out ID, out order]
+    Pack <Enactment>[W, P, S, in ID, in order, out tag, out package]
+    Load <Enactment>[W, L, S, C, in ID, in order, in tag, out route]
+    W -> M: Deliver <Action>("warehouse confirms delivery completion")[in ID, in route, out delivery]
+}
+
+Pack <Protocol>("Package preparation and tagging protocol") {
+    roles
+        W <Agent>("Warehouse coordinating packing"),
+        P <Agent>("Packer performing packaging tasks"),
+        S <Agent>("Scanner handling tag operations")
+    
+    parameters
+        ID <String>("unique identifier for the packing operation"),
+        order <String>("order details for packing"),
+        tag <String>("generated package tag"),
+        package <String>("completed package"),
+        data <String>("tag data information"),
+        written <String>("tag writing confirmation")
+    
+    W -> P: Pack <Action>("warehouse requests packing of order")[in ID, in order]
+    P -> W: Tag <Action>("packer generates package tag")[in ID, in order, out tag]
+    P -> S: WriteTag <Action>("packer requests tag writing")[in ID, in order, in tag, out data]
+    S -> P: TagWritten <Action>("scanner confirms tag written")[in ID, in tag, in data, out written]
+    P -> W: Packed <Action>("packer confirms package completion")[in ID, in written, out package]
+}
+
+Load <Protocol>("Loading and vehicle preparation protocol") {
+    roles
+        W <Agent>("Warehouse coordinating loading"),
+        L <Agent>("Loader managing loading operations"),
+        S <Agent>("Scanner finding packages"),
+        C <Agent>("Courier providing vehicle and transport")
+    
+    parameters
+        ID <String>("unique identifier for the loading operation"),
+        order <String>("order details for loading"),
+        tag <String>("package tag for identification"),
+        route <String>("final transportation route"),
+        type <String>("vehicle type specification"),
+        vehicle <String>("assigned vehicle information"),
+        find <String>("package search request"),
+        package <String>("located package information"),
+        loaded <String>("loading completion confirmation")
+    
+    W -> L: Load <Action>("warehouse initiates loading process")[in ID, in order, in tag]
+    L -> C: GetVehicle <Action>("loader requests appropriate vehicle")[in ID, in order, out type]
+    C -> L: SendVehicle <Action>("courier provides vehicle details")[in ID, in type, out vehicle]
+    L -> S: FindPackage <Action>("loader requests package location")[in ID, in tag, out find]
+    S -> L: FoundPackage <Action>("scanner reports package location")[in ID, in tag, out package]
+    L -> C: LoadVehicle <Action>("loader completes vehicle loading")[in ID, in package, in vehicle, out loaded]
+    C -> W: Enroute <Action>("courier confirms departure and route")[in ID, in vehicle, in package, out route]
+}
