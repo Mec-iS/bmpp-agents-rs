@@ -184,8 +184,6 @@ dependencies = [
  "mockall",
  "once_cell",
  "peg",
- "pest",
- "pest_derive",
  "regex",
  "reqwest",
  "serde",
