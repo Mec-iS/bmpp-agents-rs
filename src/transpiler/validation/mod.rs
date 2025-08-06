@@ -41,6 +41,8 @@ fn validate_protocol_parameter_flow(protocol_node: &AstNode) -> Result<()> {
         }
     }
     
+    // First validate unreachable interactions before other checks
+    validate_unreachable_interactions(&parameter_info, &interactions, &protocol_name)?;
     validate_flow_consistency(&parameter_info, &interactions, &protocol_name)?;
     validate_causality(&parameter_info, &interactions, &protocol_name)?;
     validate_completeness(&parameter_info, &protocol_name)?;
@@ -316,6 +318,33 @@ fn extract_parameter_flow(node: &AstNode) -> Result<ParameterFlow> {
     })
 }
 
+/// Validates that no interactions are unreachable due to consuming unproducible parameters
+fn validate_unreachable_interactions(
+    parameters: &HashMap<String, ParameterInfo>,
+    interactions: &[InteractionInfo],
+    protocol_name: &str
+) -> Result<()> {
+    // Check each interaction for unreachable conditions
+    for interaction in interactions {
+        for flow in &interaction.parameter_flows {
+            if flow.direction == "in" {
+                if let Some(param_info) = parameters.get(&flow.parameter) {
+                    // If parameter has no producers and is not pre-protocol knowledge, 
+                    // then this interaction is unreachable
+                    if param_info.producers.is_empty() && !is_pre_protocol_parameter(&flow.parameter) {
+                        return Err(anyhow!(
+                            "Interaction '{}' is unreachable because parameter '{}' is consumed but never produced in protocol '{}' - BSPL completeness violation",
+                            interaction.action, flow.parameter, protocol_name
+                        ));
+                    }
+                }
+            }
+        }
+    }
+    
+    Ok(())
+}
+
 /// Validates basic flow consistency according to BSPL rules with parallel process support
 fn validate_flow_consistency(
     parameters: &HashMap<String, ParameterInfo>, 
@@ -331,15 +360,6 @@ fn validate_flow_consistency(
                 return Err(anyhow!(
                     "Parameter '{}' is produced by multiple interactions {:?} in protocol '{}' - BSPL safety violation",
                     param_name, producers, protocol_name
-                ));
-            }
-        }
-        
-        if !param_info.consumers.is_empty() && param_info.producers.is_empty() {
-            if !is_pre_protocol_parameter(param_name) {
-                return Err(anyhow!(
-                    "Parameter '{}' is consumed but never produced in protocol '{}' - BSPL completeness violation",
-                    param_name, protocol_name
                 ));
             }
         }

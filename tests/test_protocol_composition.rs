@@ -15,10 +15,10 @@ fn test_protocol_composition_basic() -> Result<()> {
                 tag <String>("package tag"),
                 package <String>("packaged item")
             
-            W -> P: Pack <Action>("pack the order")[out ID, out order]
-            P -> W: Tag <Action>("tag the package")[in ID, in order, out tag]
-            P -> S: WriteTag <Action>("write tag data")[in ID, in order, in tag]
-            S -> P: TagWritten <Action>("confirm tag written")[in ID, in tag, out package]
+            W -> P: pack <Action>("pack the order")[out ID, out order]
+            P -> W: pag <Action>("tag the package")[in ID, in order, out tag]
+            P -> S: writeTag <Action>("write tag data")[in ID, in order, in tag]
+            S -> P: tagWritten <Action>("confirm tag written")[in ID, in tag, out package]
         }
         
         Logistics <Protocol>("Logistics protocol using Pack") {
@@ -34,9 +34,9 @@ fn test_protocol_composition_basic() -> Result<()> {
                 order <String>("order details"),
                 delivery <String>("delivery confirmation")
             
-            M -> W: NotifyOrder <Action>("notify of new order")[out ID, out order]
-            Pack(W, P, S, in ID, in order, out tag, out package)
-            W -> M: Deliver <Action>("confirm delivery")[in ID, in package, out delivery]
+            M -> W: notifyOrder <Action>("notify of new order")[out ID, out order]
+            Pack <Enactment>(W, P, S, in ID, in order, out tag, out package)
+            W -> M: deliver <Action>("confirm delivery")[in ID, in package, out delivery]
         }
     "#;
     
@@ -102,13 +102,15 @@ fn test_nested_protocol_composition() -> Result<()> {
                 delivery <String>("delivery")
             
             M -> W: NotifyOrder <Action>("notify order")[out ID, out order]
-            Pack[W, P, S, in ID, in order, out tag, out package]
-            Load[W, L, S, C, in ID, in order, in tag, out route]
+            Pack <Enactment>[W, P, S, in ID, in order, out tag, out package]
+            Load <Enactment>[W, L, S, C, in ID, in order, in tag, out route]
             W -> M: Deliver <Action>("deliver")[in ID, in route, out delivery]
         }
     "#;
     
     let ast = parse_source(bmpp_source)?;
+
+    println!("test_nested_protocol_composition AST \n{}", &ast);
     let code_generator = BmppCodeGenerator::new();
     let generated_code = code_generator.generate(&ast)?;
     
